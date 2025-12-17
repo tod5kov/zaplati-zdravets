@@ -17,11 +17,6 @@ th,td { border:1px solid #000; padding:5px; font-size:12px; text-align:center; }
 th { background:#e8eef5; }
 input { width:95px; }
 
-.archive { background:#fff; border:1px solid #999; padding:8px; border-radius:6px; margin:10px 0; }
-.archive ul { margin:6px 0 0; padding-left:18px; }
-.archive li { cursor:pointer; margin:4px 0; }
-.archive li:hover { text-decoration:underline; }
-
 .notice { font-size:12px; color:#333; margin:8px 0 12px; display:none; }
 .notice b { color:#b00020; }
 
@@ -64,10 +59,6 @@ input { width:95px; }
   Данните няма да се пазят след затваряне.
 </div>
 
-<div class="archive">
-  <b>Архив по месеци</b>
-  <ul id="archiveList"></ul>
-</div>
 
 <table class="no-print">
 <thead>
@@ -262,51 +253,6 @@ function loadState(m = monthEl.value, y = yearEl.value) {
 
   // След като заредим – записваме само ако storage работи, за да фиксираме структурата
   if (STORAGE_OK) saveState();
-}
-
-/* ================= ARCHIVE ================= */
-function renderArchive() {
-  archiveList.innerHTML = "";
-
-  const keys = storageKeys()
-    .filter(k => k.startsWith("zaplati_"));
-
-  // сортиране: година desc, месец desc
-  keys.sort((a,b) => {
-    const [,ya,ma] = a.split("_");
-    const [,yb,mb] = b.split("_");
-    const da = Number(ya)*100 + monthIndex(ma);
-    const db = Number(yb)*100 + monthIndex(mb);
-    return db - da;
-  });
-
-  keys.forEach(k => {
-    const parts = k.split("_");
-    if (parts.length < 3) return;
-    const year = parts[1];
-    const month = parts.slice(2).join("_"); // ако някога има _ в текста
-
-    const li = document.createElement("li");
-    li.textContent = `${month} ${year}`;
-    li.addEventListener("click", () => {
-      monthEl.value = month;
-      yearEl.value = year;
-      loadState(month, year);
-      // чисто UX: показваме какво е заредено
-      document.getElementById("fishes").innerHTML = "";
-      document.getElementById("summary").innerHTML = "";
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-    archiveList.appendChild(li);
-  });
-
-  if (keys.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = "Няма записани месеци.";
-    li.style.cursor = "default";
-    li.style.textDecoration = "none";
-    archiveList.appendChild(li);
-  }
 }
 
 /* ================= OUTPUT ================= */
