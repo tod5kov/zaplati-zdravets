@@ -2,7 +2,7 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<title>1Заплати – Ведомост и фишове</title>
+<title>2Заплати – Ведомост и фишове</title>
 
 <style>
 body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
@@ -150,12 +150,19 @@ function saveState() {
 
 function loadState() {
   tbody.innerHTML = "";
+
   const raw = localStorage.getItem(storageKey());
   if (raw) {
-    JSON.parse(raw).forEach(e => addRow(e));
+    const rows = JSON.parse(raw);
+    rows.forEach(e => addRow(e));
   }
-  if (tbody.children.length === 0) addRow();
+
+  // ⬅ ВИНАГИ поне един ред
+  if (tbody.children.length === 0) {
+    addRow();
+  }
 }
+
 
 /* ===== PERIOD CHANGE ===== */
 monthEl.addEventListener("change", loadState);
