@@ -679,8 +679,9 @@ function generateSummary() {
   const m = monthEl.value;
   const y = yearEl.value;
 
-  const byGroup = {}; // { group: { net, paid, rem } }
-  let totalNet = 0, totalPaid = 0, totalRem = 0;
+  const byGroup = {};
+let totalNet = 0, totalPaid = 0, totalRem = 0;
+let totalCost = 0; // 👈 ОБЩА СУМА ЗА ЗАПЛАТИ
 
   tbody.querySelectorAll("tr").forEach(tr => {
     const name = (tr.querySelector(".name").value || "").trim();
