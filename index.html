@@ -37,7 +37,7 @@ th,td {
 }
 
 th { background:#e8eef5; }
-input[type="number"] { width:90px; }
+input[type="number"] { width:80px; }
 input.name { width:140px; }
 
 tr.dragging { opacity:0.4; }
@@ -103,6 +103,7 @@ tr.dragging { opacity:0.4; }
   </label>
 
   <button id="btnAddRow">➕ Служител</button>
+  <button id="btnLoadTemplate">🧩 Зареди шаблон</button>
   <button id="btnAddTemplate">➕ Шаблон служител</button>
   <button id="btnEditTemplate">✏️ Редакция шаблон</button>
   <button id="btnGenerate">🔄 Генерирай</button>
@@ -121,6 +122,8 @@ tr.dragging { opacity:0.4; }
 <th>Ставка</th>
 <th>Заплата</th>
 <th>Дни</th>
+<th>Пътни/ден</th>
+<th>Пътни</th>
 <th>Добавки</th>
 <th>Остатък</th>
 </tr>
@@ -193,14 +196,23 @@ function getTemplate() {
   return JSON.parse(localStorage.getItem(STAFF_KEY(objectSelect.value)) || "[]");
 }
 
+function loadTemplateIntoTable() {
+  tbody.innerHTML = "";
+  const tpl = getTemplate();
+  if (tpl.length === 0) {
+    addRow();
+    return;
+  }
+  tpl.forEach(s => addRow(s));
+}
+
 function addTemplateStaff() {
   const name = prompt("Име:");
   if (!name) return;
-  const group = prompt("Група (Рецепция / Домакинство):");
+  const group = prompt("Група:");
   const role = prompt("Роля:");
   if (!ROLE_RULES[role]) return alert("Непозната роля");
   const base = n(prompt("Основна заплата:", "0"));
-
   const staff = getTemplate();
   staff.push({ name, group, role, base });
   localStorage.setItem(STAFF_KEY(objectSelect.value), JSON.stringify(staff));
@@ -245,6 +257,8 @@ function addRow(data={}) {
 <td class="stavka">0.00</td>
 <td class="zap">0.00</td>
 <td><input type="number" class="dni"></td>
+<td><input type="number" class="pden"></td>
+<td class="patni">0.00</td>
 <td><input type="number" class="dob" value="0"></td>
 <td class="ostatak">0.00</td>`;
   tr.querySelectorAll("input").forEach(i=>i.addEventListener("input",()=>calc(tr)));
@@ -253,6 +267,7 @@ function addRow(data={}) {
   calc(tr);
 }
 
+/* ===== DRAG ===== */
 function enableDrag(tr) {
   tr.addEventListener("dragstart",()=>tr.classList.add("dragging"));
   tr.addEventListener("dragend",()=>tr.classList.remove("dragging"));
@@ -275,6 +290,7 @@ function calc(tr) {
   const chm=n(tr.querySelector(".chm").value);
   const otr=n(tr.querySelector(".otr").value);
   const dni=n(tr.querySelector(".dni").value);
+  const pden=n(tr.querySelector(".pden").value);
   const dob=n(tr.querySelector(".dob").value);
 
   let zap=0,stavka=0;
@@ -286,11 +302,13 @@ function calc(tr) {
   if(rule==="daily") zap=dni*osn;
   if(rule==="fixed") zap=osn;
 
-  zap+=dob;
+  const patni=dni*pden;
+  const total=zap+patni+dob;
 
   tr.querySelector(".stavka").textContent=f(stavka);
   tr.querySelector(".zap").textContent=f(zap);
-  tr.querySelector(".ostatak").textContent=f(zap);
+  tr.querySelector(".patni").textContent=f(patni);
+  tr.querySelector(".ostatak").textContent=f(total);
 }
 
 /* ===== SAVE / LOAD ===== */
@@ -311,7 +329,7 @@ function loadState() {
   tbody.innerHTML="";
   const raw=localStorage.getItem(DATA_KEY());
   if(raw) JSON.parse(raw).forEach(r=>addRow(r));
-  else getTemplate().forEach(s=>addRow(s));
+  else loadTemplateIntoTable();
 }
 
 /* ===== OUTPUT ===== */
@@ -329,6 +347,7 @@ function generateAll() {
 /* ===== EVENTS ===== */
 document.getElementById("btnAddObject").addEventListener("click",addObject);
 document.getElementById("btnAddRow").addEventListener("click",()=>addRow());
+document.getElementById("btnLoadTemplate").addEventListener("click",loadTemplateIntoTable);
 document.getElementById("btnAddTemplate").addEventListener("click",addTemplateStaff);
 document.getElementById("btnEditTemplate").addEventListener("click",openTemplateModal);
 document.getElementById("btnDeleteTemplate").addEventListener("click",deleteTemplateStaff);
