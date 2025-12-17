@@ -1,308 +1,747 @@
 <!DOCTYPE html>
 <html lang="bg">
 <head>
-<meta charset="UTF-8">
-<title>Заплати – Ведомост и фишове</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Заплати – Ведомост, фишове, шаблони</title>
 
 <style>
-body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
-h2,h3 { margin:8px 0; }
+  body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
+  h2,h3 { margin:8px 0; }
 
-.toolbar {
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  align-items:center;
-  margin-bottom:15px;
-}
+  .toolbar {
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    margin:10px 0 15px;
+  }
 
-button, select, input {
-  padding:6px 10px;
-  border:1px solid #333;
-  background:#fff;
-  border-radius:6px;
-}
+  button, select, input {
+    padding:6px 10px; border:1px solid #333; background:#fff; border-radius:6px;
+  }
+  button { cursor:pointer; }
+  button:hover { background:#eee; }
 
-table {
-  border-collapse: collapse;
-  width:100%;
-  background:#fff;
-}
+  table { border-collapse: collapse; width:100%; background:#fff; }
+  th,td { border:1px solid #000; padding:5px; font-size:12px; text-align:center; }
+  th { background:#e8eef5; }
 
-th,td {
-  border:1px solid #000;
-  padding:5px;
-  font-size:12px;
-  text-align:center;
-}
+  input[type="number"] { width:86px; }
+  input.name { width:170px; }
 
-th { background:#e8eef5; }
-input[type="number"] { width:80px; }
-input.name { width:140px; }
+  tr.dragging { opacity: .4; }
 
-tr.dragging { opacity:0.4; }
+  .section { margin-top:18px; }
 
-.fish {
-  border:1px solid #000;
-  padding:10px;
-  margin:10px 0;
-  page-break-inside:avoid;
-}
+  .fish { border:1px solid #000; padding:10px; margin:10px 0; page-break-inside:avoid; background:#fff; }
+  .cut { border-top:2px dashed #000; margin:12px 0; }
 
-.cut { border-top:2px dashed #000; margin:12px 0; }
+  .muted { color:#555; font-size:12px; }
 
-/* ===== MODALS ===== */
-.modal {
-  display:none;
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.4);
-  align-items:center;
-  justify-content:center;
-}
+  /* ===== MODALS ===== */
+  .modal {
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.45);
+    align-items:center;
+    justify-content:center;
+    z-index: 999;
+  }
+  .modal-content {
+    background:#fff;
+    padding:14px;
+    width:min(760px, 94vw);
+    max-height:86vh;
+    overflow:auto;
+    border-radius:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+  .modal h3 { margin-top:0; }
+  .grid {
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:10px 12px;
+    margin-top:10px;
+  }
+  .grid label { display:block; font-size:12px; color:#222; }
+  .grid input, .grid select { width:100%; margin-top:4px; }
+  .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
 
-.modal-content {
-  background:#fff;
-  padding:15px;
-  width:420px;
-  border-radius:8px;
-}
+  .tpl-table { width:100%; border-collapse:collapse; background:#fff; margin-top:8px; }
+  .tpl-table th, .tpl-table td { border:1px solid #999; padding:6px; font-size:12px; }
+  .tpl-table th { background:#f2f2f2; }
+  .tpl-left { text-align:left; }
 
-.modal label { display:block; margin:6px 0; }
-
-@media print {
-  .toolbar, .modal { display:none !important; }
-  body { background:#fff; padding:0; }
-}
+  @media print {
+    .toolbar, .no-print, .modal { display:none !important; }
+    body { background:#fff; padding:0; }
+    .page-break { page-break-after: always; }
+  }
 </style>
 </head>
 
 <body>
+  <h2>Заплати</h2>
 
-<h2>Заплати</h2>
+  <div class="toolbar no-print">
+    <label>Обект:
+      <select id="objectSelect"></select>
+    </label>
+    <button id="btnAddObject">➕ Обект</button>
 
-<div class="toolbar">
-  <label>Обект:
-    <select id="objectSelect"></select>
-  </label>
-  <button id="btnAddObject">➕ Обект</button>
-
-  <label>Месец:
-    <select id="month">
-      <option>Януари</option><option>Февруари</option><option>Март</option>
-      <option>Април</option><option>Май</option><option>Юни</option>
-      <option>Юли</option><option>Август</option><option>Септември</option>
-      <option>Октомври</option><option>Ноември</option><option>Декември</option>
-    </select>
-  </label>
-
-  <label>Година:
-    <input type="number" id="year" value="2025" style="width:80px;">
-  </label>
-
-  <button id="btnAddRow">➕ Служител</button>
-  <button id="btnLoadTemplate">🧩 Зареди шаблон</button>
-  <button id="btnAddTemplate">➕ Шаблон служител</button>
-  <button id="btnGenerate">🔄 Генерирай</button>
-</div>
-
-<table>
-<thead>
-<tr>
-<th></th>
-<th>Име</th>
-<th>Група</th>
-<th>Роля</th>
-<th>Основна</th>
-<th>Час/мес</th>
-<th>Отраб.</th>
-<th>Заплата</th>
-<th>Дни</th>
-<th>Пътни</th>
-<th>Добавки</th>
-<th>Остатък</th>
-</tr>
-</thead>
-<tbody id="tbody"></tbody>
-</table>
-
-<div id="summary"></div>
-
-<!-- ===== MODAL ADD TEMPLATE ===== -->
-<div id="templateModal" class="modal">
-  <div class="modal-content">
-    <h3>Нов служител (шаблон)</h3>
-
-    <label>Име:
-      <input id="tplName">
+    <label>Месец:
+      <select id="month">
+        <option>Януари</option><option>Февруари</option><option>Март</option>
+        <option>Април</option><option>Май</option><option>Юни</option>
+        <option>Юли</option><option>Август</option><option>Септември</option>
+        <option>Октомври</option><option>Ноември</option><option>Декември</option>
+      </select>
     </label>
 
-    <label>Група:
-      <select id="tplGroup"></select>
+    <label>Година:
+      <input type="number" id="year" value="2025" style="width:90px;">
     </label>
 
-    <label>Роля:
-      <select id="tplRole"></select>
-    </label>
+    <button id="btnAddRow">➕ Служител</button>
+    <button id="btnLoadTemplate">🧩 Зареди шаблон</button>
+    <button id="btnManageTemplate">👤 Редактирай служители</button>
 
-    <label>Основна заплата:
-      <input type="number" id="tplBase" value="0">
-    </label>
-
-    <button id="btnSaveTemplate">Запази</button>
-    <button onclick="closeTemplateModal()">Отказ</button>
+    <button id="btnGenerate">🔄 Генерирай</button>
+    <button id="btnPrint">🖨 Печат</button>
   </div>
-</div>
+
+  <div class="muted no-print">
+    • Формули: <b>Нетно = Заплата + Пътни + Добавки − Аванс − Удръжки</b> <br>
+    • Роли: <b>hourly</b> (Основна/Часове×Отработени), <b>daily</b> (Дни×Ставка/ден), <b>fixed</b> (Основна).
+  </div>
+
+  <!-- ================== MAIN TABLE ================== -->
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th>Име</th>
+        <th>Група</th>
+        <th>Роля</th>
+        <th>Основна</th>
+        <th>Час/мес</th>
+        <th>Отраб.</th>
+        <th>Ставка/час</th>
+        <th>Заплата</th>
+        <th>Дни</th>
+        <th>Ставка/ден</th>
+        <th>Пътни</th>
+        <th>Добавки</th>
+        <th>Аванс</th>
+        <th>Удръжки</th>
+        <th>Нетно</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <!-- ================== OUTPUT ================== -->
+  <div id="fishes" class="section"></div>
+  <div id="summary" class="section"></div>
+
+  <!-- ================== TEMPLATE MANAGER MODAL ================== -->
+  <div id="tplModal" class="modal">
+    <div class="modal-content">
+      <h3>Шаблон служители – <span id="tplObjectName"></span></h3>
+      <div class="muted">Добавяй/редактирай служители за текущия обект. При „Зареди шаблон“ се вкарват в таблицата.</div>
+
+      <div class="modal-actions" style="justify-content:space-between;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btnTplAdd">➕ Нов служител</button>
+          <button id="btnTplDeleteSelected">🗑 Изтрий избраните</button>
+        </div>
+        <button id="btnTplClose">Затвори</button>
+      </div>
+
+      <table class="tpl-table" aria-label="template table">
+        <thead>
+          <tr>
+            <th style="width:34px;">✓</th>
+            <th class="tpl-left">Име</th>
+            <th>Група</th>
+            <th>Роля</th>
+            <th>Основна</th>
+            <th>Ставка/ден</th>
+            <th style="width:92px;">Действия</th>
+          </tr>
+        </thead>
+        <tbody id="tplTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ================== TEMPLATE EDIT/ADD MODAL ================== -->
+  <div id="tplEditModal" class="modal">
+    <div class="modal-content">
+      <h3 id="tplEditTitle">Служител (шаблон)</h3>
+
+      <div class="grid">
+        <div>
+          <label>Име
+            <input id="tplName" />
+          </label>
+        </div>
+
+        <div>
+          <label>Група
+            <select id="tplGroup"></select>
+          </label>
+        </div>
+
+        <div>
+          <label>Роля
+            <select id="tplRole"></select>
+          </label>
+        </div>
+
+        <div>
+          <label>Основна заплата
+            <input type="number" id="tplBase" value="0" />
+          </label>
+        </div>
+
+        <div>
+          <label>Ставка/ден (за daily роли)
+            <input type="number" id="tplDayRate" value="0" />
+          </label>
+        </div>
+
+        <div class="muted" style="align-self:end;">
+          Ако ролята е <b>Камериерка</b> (daily) → използва <b>Дни × Ставка/ден</b>.
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="btnTplSave">Запази</button>
+        <button id="btnTplCancel">Отказ</button>
+      </div>
+    </div>
+  </div>
 
 <script>
-/* ===== CONFIG ===== */
+/* ================= CONFIG ================= */
 const GROUPS = ["Рецепция","Домакинство","Ресторант","Поддръжка"];
+
 const ROLE_RULES = {
-  "Рецепционист":"hourly",
-  "Камериерка":"daily",
-  "Поддръжка":"fixed",
-  "Сезонен":"hourly"
+  "Рецепционист": "hourly",
+  "Администратор": "hourly",
+  "Камериерка": "daily",
+  "Поддръжка": "fixed",
+  "Сезонен": "hourly"
 };
 
-const OBJECTS_KEY="zaplati_objects";
-const STAFF_KEY=o=>`zaplati_staff_${o}`;
+const OBJECTS_KEY = "zaplati_objects";
+const STAFF_KEY = (obj) => `zaplati_staff_${obj}`;
 
-/* ===== HELPERS ===== */
-const n=v=>Number(v)||0;
-const f=v=>n(v).toFixed(2);
+/* ================= HELPERS ================= */
+const n = (v) => Number(v) || 0;
+const f = (v) => (Math.round((n(v) + Number.EPSILON) * 100) / 100).toFixed(2);
 
-/* ===== ELEMENTS ===== */
-const tbody=document.getElementById("tbody");
-const objectSelect=document.getElementById("objectSelect");
-const monthEl=document.getElementById("month");
-const yearEl=document.getElementById("year");
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+}
 
-/* ===== OBJECTS ===== */
-function loadObjects(){
-  const objs=JSON.parse(localStorage.getItem(OBJECTS_KEY)||'["Еко комплекс Здравец"]');
-  objectSelect.innerHTML="";
-  objs.forEach(o=>{
-    const opt=document.createElement("option");
-    opt.value=o; opt.textContent=o;
+/* ================= ELEMENTS ================= */
+const tbody = document.getElementById("tbody");
+const objectSelect = document.getElementById("objectSelect");
+const monthEl = document.getElementById("month");
+const yearEl = document.getElementById("year");
+
+const fishesEl = document.getElementById("fishes");
+const summaryEl = document.getElementById("summary");
+
+/* ================= STORAGE KEYS ================= */
+function dataKey(obj = objectSelect.value, y = yearEl.value, m = monthEl.value) {
+  return `zaplati_${obj}_${y}_${m}`;
+}
+
+/* ================= OBJECTS ================= */
+function loadObjects() {
+  const objs = JSON.parse(localStorage.getItem(OBJECTS_KEY) || '["Еко комплекс Здравец"]');
+  objectSelect.innerHTML = "";
+  objs.forEach(o => {
+    const opt = document.createElement("option");
+    opt.value = o;
+    opt.textContent = o;
     objectSelect.appendChild(opt);
   });
 }
 
-/* ===== TEMPLATE ===== */
-function getTemplate(){
-  return JSON.parse(localStorage.getItem(STAFF_KEY(objectSelect.value))||"[]");
+function addObject() {
+  const name = prompt("Име на обекта:");
+  if (!name) return;
+  const objs = JSON.parse(localStorage.getItem(OBJECTS_KEY) || "[]");
+  if (!objs.includes(name)) objs.push(name);
+  localStorage.setItem(OBJECTS_KEY, JSON.stringify(objs));
+  loadObjects();
+  objectSelect.value = name;
+  loadState();
 }
 
-function openTemplateModal(){
-  document.getElementById("tplName").value="";
-  document.getElementById("tplBase").value=0;
-
-  const gSel=document.getElementById("tplGroup");
-  const rSel=document.getElementById("tplRole");
-
-  gSel.innerHTML=GROUPS.map(g=>`<option>${g}</option>`).join("");
-  rSel.innerHTML=Object.keys(ROLE_RULES).map(r=>`<option>${r}</option>`).join("");
-
-  document.getElementById("templateModal").style.display="flex";
+/* ================= TEMPLATE DATA ================= */
+function getTemplate(obj = objectSelect.value) {
+  // array of {name, group, role, base, dayRate}
+  return JSON.parse(localStorage.getItem(STAFF_KEY(obj)) || "[]");
 }
 
-function closeTemplateModal(){
-  document.getElementById("templateModal").style.display="none";
+function setTemplate(list, obj = objectSelect.value) {
+  localStorage.setItem(STAFF_KEY(obj), JSON.stringify(list));
 }
 
-function saveTemplateStaff(){
-  const staff=getTemplate();
-  staff.push({
-    name:tplName.value,
-    group:tplGroup.value,
-    role:tplRole.value,
-    base:n(tplBase.value)
+/* ================= TEMPLATE UI ================= */
+const tplModal = document.getElementById("tplModal");
+const tplObjectName = document.getElementById("tplObjectName");
+const tplTableBody = document.getElementById("tplTableBody");
+
+const tplEditModal = document.getElementById("tplEditModal");
+const tplEditTitle = document.getElementById("tplEditTitle");
+const tplName = document.getElementById("tplName");
+const tplGroup = document.getElementById("tplGroup");
+const tplRole = document.getElementById("tplRole");
+const tplBase = document.getElementById("tplBase");
+const tplDayRate = document.getElementById("tplDayRate");
+
+let tplEditIndex = null; // null = add new
+
+function openTplModal() {
+  tplObjectName.textContent = objectSelect.value;
+  renderTplTable();
+  tplModal.style.display = "flex";
+}
+
+function closeTplModal() {
+  tplModal.style.display = "none";
+}
+
+function openTplEditModal(index = null) {
+  tplEditIndex = index;
+
+  // fill dropdowns
+  tplGroup.innerHTML = GROUPS.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join("");
+  tplRole.innerHTML = Object.keys(ROLE_RULES).map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
+
+  if (index === null) {
+    tplEditTitle.textContent = "Нов служител (шаблон)";
+    tplName.value = "";
+    tplGroup.value = GROUPS[0] || "";
+    tplRole.value = Object.keys(ROLE_RULES)[0] || "";
+    tplBase.value = 0;
+    tplDayRate.value = 0;
+  } else {
+    const list = getTemplate();
+    const item = list[index];
+    tplEditTitle.textContent = "Редакция служител (шаблон)";
+    tplName.value = item?.name || "";
+    tplGroup.value = item?.group || (GROUPS[0] || "");
+    tplRole.value = item?.role || (Object.keys(ROLE_RULES)[0] || "");
+    tplBase.value = n(item?.base);
+    tplDayRate.value = n(item?.dayRate);
+  }
+
+  tplEditModal.style.display = "flex";
+}
+
+function closeTplEditModal() {
+  tplEditModal.style.display = "none";
+}
+
+function saveTplEdit() {
+  const name = (tplName.value || "").trim();
+  if (!name) { alert("Моля, въведи име."); return; }
+
+  const item = {
+    name,
+    group: tplGroup.value,
+    role: tplRole.value,
+    base: n(tplBase.value),
+    dayRate: n(tplDayRate.value)
+  };
+
+  const list = getTemplate();
+  if (tplEditIndex === null) list.push(item);
+  else list[tplEditIndex] = item;
+
+  setTemplate(list);
+  closeTplEditModal();
+  renderTplTable();
+}
+
+function deleteSelectedTpl() {
+  const list = getTemplate();
+  const checked = Array.from(document.querySelectorAll(".tpl-check:checked")).map(c => Number(c.value));
+  if (checked.length === 0) { alert("Няма избрани служители."); return; }
+  if (!confirm(`Да изтрия ${checked.length} служителя от шаблона?`)) return;
+
+  const newList = list.filter((_, idx) => !checked.includes(idx));
+  setTemplate(newList);
+  renderTplTable();
+}
+
+function renderTplTable() {
+  const list = getTemplate();
+  tplTableBody.innerHTML = "";
+
+  if (list.length === 0) {
+    tplTableBody.innerHTML = `<tr><td colspan="7" class="tpl-left"><i>Няма служители в шаблона за този обект.</i></td></tr>`;
+    return;
+  }
+
+  list.forEach((s, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input class="tpl-check" type="checkbox" value="${i}"></td>
+      <td class="tpl-left">${esc(s.name)}</td>
+      <td>${esc(s.group)}</td>
+      <td>${esc(s.role)}</td>
+      <td>${f(s.base)}</td>
+      <td>${f(s.dayRate)}</td>
+      <td>
+        <button class="tpl-edit-btn" data-index="${i}">Редактирай</button>
+      </td>
+    `;
+    tplTableBody.appendChild(tr);
   });
-  localStorage.setItem(STAFF_KEY(objectSelect.value),JSON.stringify(staff));
-  closeTemplateModal();
+
+  // bind edit buttons
+  tplTableBody.querySelectorAll(".tpl-edit-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.currentTarget.getAttribute("data-index"));
+      openTplEditModal(idx);
+    });
+  });
 }
 
-/* ===== ROW ===== */
-function addRow(d={}){
-  const tr=document.createElement("tr");
-  tr.innerHTML=`
-<td>::</td>
-<td><input class="name" value="${d.name||""}"></td>
-<td class="group">${d.group||""}</td>
-<td class="role">${d.role||""}</td>
-<td><input class="osn" type="number" value="${d.base||""}"></td>
-<td><input class="chm" type="number"></td>
-<td><input class="otr" type="number"></td>
-<td class="zap">0.00</td>
-<td><input class="dni" type="number"></td>
-<td><input class="pat" type="number"></td>
-<td><input class="dob" type="number" value="0"></td>
-<td class="ostatak">0.00</td>`;
-  tr.querySelectorAll("input").forEach(i=>i.oninput=()=>calc(tr));
+/* ================= ROWS (Main Table) ================= */
+function buildRow(prefill = {}) {
+  const tr = document.createElement("tr");
+  tr.draggable = true;
+
+  tr.innerHTML = `
+    <td>::</td>
+    <td><input class="name" value="${esc(prefill.name || "")}"></td>
+    <td class="group">${esc(prefill.group || "")}</td>
+    <td class="role">${esc(prefill.role || "")}</td>
+
+    <td><input type="number" class="base" value="${prefill.base ?? ""}"></td>
+    <td><input type="number" class="hoursMonth" value="${prefill.hoursMonth ?? ""}"></td>
+    <td><input type="number" class="hoursWorked" value="${prefill.hoursWorked ?? ""}"></td>
+
+    <td class="hourRate">0.00</td>
+    <td class="salary">0.00</td>
+
+    <td><input type="number" class="days" value="${prefill.days ?? ""}"></td>
+    <td><input type="number" class="dayRate" value="${prefill.dayRate ?? 0}"></td>
+
+    <td class="travel">0.00</td>
+
+    <td><input type="number" class="bonus" value="${prefill.bonus ?? 0}"></td>
+    <td><input type="number" class="advance" value="${prefill.advance ?? 0}"></td>
+    <td><input type="number" class="deduct" value="${prefill.deduct ?? 0}"></td>
+
+    <td class="net">0.00</td>
+  `;
+
+  tr.querySelectorAll("input").forEach(inp => {
+    inp.addEventListener("input", () => {
+      calcRow(tr);
+      saveState();
+    });
+  });
+
+  enableDrag(tr);
+  return tr;
+}
+
+function addRow(prefill = {}) {
+  const tr = buildRow(prefill);
   tbody.appendChild(tr);
+  calcRow(tr);
+  saveState();
 }
 
-/* ===== CALC ===== */
-function calc(tr){
-  const rule=ROLE_RULES[tr.querySelector(".role").textContent];
-  const osn=n(tr.querySelector(".osn").value);
-  const chm=n(tr.querySelector(".chm").value);
-  const otr=n(tr.querySelector(".otr").value);
-  const dni=n(tr.querySelector(".dni").value);
-  const pat=n(tr.querySelector(".pat").value);
-  const dob=n(tr.querySelector(".dob").value);
+function enableDrag(tr) {
+  tr.addEventListener("dragstart", () => tr.classList.add("dragging"));
+  tr.addEventListener("dragend", () => { tr.classList.remove("dragging"); saveState(); });
 
-  let zap=0;
-  if(rule==="hourly") zap=chm?osn/chm*otr:0;
-  if(rule==="daily") zap=dni*osn;
-  if(rule==="fixed") zap=osn;
+  tbody.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    const dragging = tbody.querySelector(".dragging");
+    if (!dragging) return;
 
-  tr.querySelector(".zap").textContent=f(zap);
-  tr.querySelector(".ostatak").textContent=f(zap+pat+dob);
+    const rows = [...tbody.querySelectorAll("tr:not(.dragging)")];
+    const after = rows.find(r => e.clientY < r.getBoundingClientRect().top + r.offsetHeight / 2);
+    after ? tbody.insertBefore(dragging, after) : tbody.appendChild(dragging);
+  }, { passive: false });
 }
 
-/* ===== LOAD ===== */
-function loadState(){
-  tbody.innerHTML="";
-  const raw=localStorage.getItem(`zaplati_${objectSelect.value}_${yearEl.value}_${monthEl.value}`);
-  if(raw) JSON.parse(raw).forEach(r=>addRow(r));
-  else getTemplate().forEach(s=>addRow(s));
-  if(tbody.children.length===0) addRow();
+/* ================= CALC ================= */
+function calcRow(tr) {
+  const role = tr.querySelector(".role").textContent.trim();
+  const rule = ROLE_RULES[role] || "hourly";
+
+  const base = n(tr.querySelector(".base").value);
+  const hoursMonth = n(tr.querySelector(".hoursMonth").value);
+  const hoursWorked = n(tr.querySelector(".hoursWorked").value);
+
+  const days = n(tr.querySelector(".days").value);
+  const dayRate = n(tr.querySelector(".dayRate").value);
+
+  const bonus = n(tr.querySelector(".bonus").value);
+  const advance = n(tr.querySelector(".advance").value);
+  const deduct = n(tr.querySelector(".deduct").value);
+
+  let hourRate = 0;
+  let salary = 0;
+
+  if (rule === "hourly") {
+    hourRate = hoursMonth ? base / hoursMonth : 0;
+    salary = hourRate * hoursWorked;
+  } else if (rule === "daily") {
+    // daily uses days * dayRate (base can be informational)
+    salary = days * dayRate;
+  } else if (rule === "fixed") {
+    salary = base;
+  }
+
+  // Travel: days * (dayRateTravel?) – в тази ведомост Travel е "Дни × Ставка/ден"
+  // НО вече имаме "Ставка/ден" за daily. За пътни ще използваме същото поле? Не.
+  // За да върнем стария модел: Пътни = Дни × Ставка/ден (тук dayRate е "Ставка/ден (пътни)" за всички роли).
+  // За daily роли dayRate е и "ставка/ден за заплата". Ако искаш отделно поле за "пътни/ден", кажи – ще го разделя.
+  const travel = days * dayRate;
+
+  const net = salary + travel + bonus - advance - deduct;
+
+  tr.querySelector(".hourRate").textContent = f(hourRate);
+  tr.querySelector(".salary").textContent = f(salary);
+  tr.querySelector(".travel").textContent = f(travel);
+  tr.querySelector(".net").textContent = f(net);
 }
 
-/* ===== SUMMARY BY GROUP ===== */
-function generateSummary(){
-  const sums={};
-  tbody.querySelectorAll("tr").forEach(tr=>{
-    const g=tr.querySelector(".group").textContent||"Без група";
-    sums[g]=(sums[g]||0)+n(tr.querySelector(".ostatak").textContent);
+/* ================= SAVE / LOAD ================= */
+function collectState() {
+  const rows = [];
+  tbody.querySelectorAll("tr").forEach(tr => {
+    rows.push({
+      name: tr.querySelector(".name").value,
+      group: tr.querySelector(".group").textContent,
+      role: tr.querySelector(".role").textContent,
+
+      base: tr.querySelector(".base").value,
+      hoursMonth: tr.querySelector(".hoursMonth").value,
+      hoursWorked: tr.querySelector(".hoursWorked").value,
+
+      days: tr.querySelector(".days").value,
+      dayRate: tr.querySelector(".dayRate").value,
+
+      bonus: tr.querySelector(".bonus").value,
+      advance: tr.querySelector(".advance").value,
+      deduct: tr.querySelector(".deduct").value
+    });
+  });
+  return rows;
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(dataKey(), JSON.stringify(collectState()));
+  } catch (e) {
+    // ако някога localStorage се блокира – просто не крашваме
+  }
+}
+
+function loadState() {
+  fishesEl.innerHTML = "";
+  summaryEl.innerHTML = "";
+
+  tbody.innerHTML = "";
+  const raw = localStorage.getItem(dataKey());
+  if (raw) {
+    try {
+      const rows = JSON.parse(raw);
+      rows.forEach(r => tbody.appendChild(buildRow(r)));
+      // calc all
+      tbody.querySelectorAll("tr").forEach(calcRow);
+    } catch (e) {}
+  } else {
+    loadTemplateIntoTable();
+  }
+
+  // винаги поне 1 ред
+  if (tbody.children.length === 0) {
+    addRow();
+  } else {
+    saveState();
+  }
+}
+
+function loadTemplateIntoTable() {
+  tbody.innerHTML = "";
+  const tpl = getTemplate();
+  if (tpl.length === 0) {
+    return; // ще добавим празен ред в loadState()
+  }
+
+  tpl.forEach(s => {
+    addRow({
+      name: s.name,
+      group: s.group,
+      role: s.role,
+      base: s.base ?? 0,
+      dayRate: s.dayRate ?? 0,
+      bonus: 0,
+      advance: 0,
+      deduct: 0,
+      hoursMonth: "",
+      hoursWorked: "",
+      days: "",
+    });
+  });
+}
+
+/* ================= OUTPUT: FISHES + SUMMARY ================= */
+function generateAll() {
+  // ensure all rows calculated
+  tbody.querySelectorAll("tr").forEach(calcRow);
+
+  generateFishes();
+  generateSummary();
+}
+
+function generateFishes() {
+  const obj = objectSelect.value;
+  const m = monthEl.value;
+  const y = yearEl.value;
+
+  let html = `<h3>Фишове – ${esc(obj)} / ${esc(m)} ${esc(y)}</h3>`;
+  let count = 0;
+
+  tbody.querySelectorAll("tr").forEach((tr, i) => {
+    const name = (tr.querySelector(".name").value || "").trim();
+    if (!name) return;
+
+    count++;
+
+    html += `
+      <div class="fish">
+        <b>Служител:</b> ${esc(name)}<br>
+        <b>Група:</b> ${esc(tr.querySelector(".group").textContent)}<br>
+        <b>Роля:</b> ${esc(tr.querySelector(".role").textContent)}<br>
+        <b>Обект:</b> ${esc(obj)}<br>
+        <b>Период:</b> ${esc(m)} ${esc(y)}<br>
+        <hr>
+        <b>Заплата:</b> ${tr.querySelector(".salary").textContent} лв.<br>
+        <b>Пътни:</b> ${tr.querySelector(".travel").textContent} лв.<br>
+        <b>Добавки:</b> ${f(tr.querySelector(".bonus").value)} лв.<br>
+        <b>Аванс:</b> ${f(tr.querySelector(".advance").value)} лв.<br>
+        <b>Удръжки:</b> ${f(tr.querySelector(".deduct").value)} лв.<br>
+        <hr>
+        <b>ЗА ПОЛУЧАВАНЕ:</b> ${tr.querySelector(".net").textContent} лв.
+      </div>
+      <div class="cut"></div>
+    `;
+
+    if (count % 3 === 0) html += `<div class="page-break"></div>`;
   });
 
-  let html="<h3>Обобщение по групи</h3><table><tr><th>Група</th><th>Сума</th></tr>";
-  let total=0;
-  Object.keys(sums).forEach(g=>{
-    html+=`<tr><td>${g}</td><td>${f(sums[g])}</td></tr>`;
-    total+=sums[g];
-  });
-  html+=`<tr style="font-weight:bold"><td>ОБЩО</td><td>${f(total)}</td></tr></table>`;
-  document.getElementById("summary").innerHTML=html;
+  if (count === 0) html += `<p><i>Няма въведени служители (попълни поне име).</i></p>`;
+  fishesEl.innerHTML = html;
 }
 
-/* ===== EVENTS ===== */
-btnAddRow.onclick=()=>addRow();
-btnLoadTemplate.onclick=()=>getTemplate().forEach(s=>addRow(s));
-btnAddTemplate.onclick=openTemplateModal;
-btnSaveTemplate.onclick=saveTemplateStaff;
-btnGenerate.onclick=generateSummary;
+function generateSummary() {
+  const obj = objectSelect.value;
+  const m = monthEl.value;
+  const y = yearEl.value;
 
-monthEl.onchange=loadState;
-yearEl.oninput=loadState;
-objectSelect.onchange=loadState;
+  // totals by group
+  const byGroup = {};
+  let totalNet = 0;
 
-/* ===== INIT ===== */
+  tbody.querySelectorAll("tr").forEach(tr => {
+    const name = (tr.querySelector(".name").value || "").trim();
+    if (!name) return;
+
+    const g = (tr.querySelector(".group").textContent || "Без група").trim() || "Без група";
+    const net = n(tr.querySelector(".net").textContent);
+
+    byGroup[g] = (byGroup[g] || 0) + net;
+    totalNet += net;
+  });
+
+  // table per group
+  const groups = Object.keys(byGroup).sort((a,b) => a.localeCompare(b, "bg"));
+
+  let groupRows = groups.length
+    ? groups.map(g => `<tr><td style="text-align:left;padding-left:8px;">${esc(g)}</td><td>${f(byGroup[g])}</td></tr>`).join("")
+    : `<tr><td colspan="2"><i>Няма данни.</i></td></tr>`;
+
+  summaryEl.innerHTML = `
+    <h3>Обобщена ведомост – ${esc(obj)} / ${esc(m)} ${esc(y)}</h3>
+
+    <table style="margin-top:6px;">
+      <thead>
+        <tr><th style="text-align:left;padding-left:8px;">Група</th><th>Нетно за изплащане</th></tr>
+      </thead>
+      <tbody>
+        ${groupRows}
+        <tr style="font-weight:bold;background:#eee;">
+          <td style="text-align:left;padding-left:8px;">ОБЩО</td>
+          <td>${f(totalNet)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:26px;">
+      Съставил: ________________ &nbsp;&nbsp; Проверил: ________________
+    </p>
+  `;
+}
+
+/* ================= EVENTS (Atlas-safe) ================= */
+document.getElementById("btnAddObject").addEventListener("click", addObject);
+
+document.getElementById("btnAddRow").addEventListener("click", () => addRow());
+
+document.getElementById("btnLoadTemplate").addEventListener("click", () => {
+  loadTemplateIntoTable();
+  if (tbody.children.length === 0) addRow();
+  saveState();
+});
+
+document.getElementById("btnManageTemplate").addEventListener("click", openTplModal);
+
+document.getElementById("btnGenerate").addEventListener("click", generateAll);
+
+document.getElementById("btnPrint").addEventListener("click", () => {
+  generateAll();
+  window.print();
+});
+
+// Template modal buttons
+document.getElementById("btnTplClose").addEventListener("click", closeTplModal);
+document.getElementById("btnTplAdd").addEventListener("click", () => openTplEditModal(null));
+document.getElementById("btnTplDeleteSelected").addEventListener("click", deleteSelectedTpl);
+
+// Template edit modal buttons
+document.getElementById("btnTplSave").addEventListener("click", saveTplEdit);
+document.getElementById("btnTplCancel").addEventListener("click", closeTplEditModal);
+
+// period/object changes
+monthEl.addEventListener("change", loadState);
+yearEl.addEventListener("input", loadState);
+objectSelect.addEventListener("change", loadState);
+
+// Auto-save on exit
+window.addEventListener("beforeunload", saveState);
+
+/* ================= INIT ================= */
 loadObjects();
 loadState();
 </script>
-
 </body>
 </html>
