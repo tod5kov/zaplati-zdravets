@@ -691,6 +691,14 @@ let totalCost = 0; // 👈 ОБЩА СУМА ЗА ЗАПЛАТИ
     const net = n(tr.querySelector(".net").textContent);
     const paid = n(tr.querySelector(".paid").value);
     const rem = n(tr.querySelector(".remaining").textContent);
+    const salary = n(tr.querySelector(".salary").textContent);
+const travel = n(tr.querySelector(".travel").textContent);
+const bonus = n(tr.querySelector(".bonus").value);
+const deduct = n(tr.querySelector(".deduct").value);
+
+// ОБЩ РАЗХОД ЗА ТОЗИ СЛУЖИТЕЛ
+const cost = salary + travel + bonus - deduct;
+
 
     if (!byGroup[g]) byGroup[g] = { net: 0, paid: 0, rem: 0 };
     byGroup[g].net += net;
@@ -700,6 +708,8 @@ let totalCost = 0; // 👈 ОБЩА СУМА ЗА ЗАПЛАТИ
     totalNet += net;
     totalPaid += paid;
     totalRem += rem;
+    totalCost += cost;
+
   });
 
   const groups = Object.keys(byGroup).sort((a,b) => a.localeCompare(b, "bg"));
@@ -734,6 +744,13 @@ let totalCost = 0; // 👈 ОБЩА СУМА ЗА ЗАПЛАТИ
           <td>${f(totalPaid)}</td>
           <td>${f(totalRem)}</td>
         </tr>
+        <tr style="font-weight:bold;background:#dfefff;">
+  <td colspan="3" style="text-align:left;padding-left:8px;">
+    ОБЩА СУМА ЗА ЗАПЛАТИ ЗА МЕСЕЦА
+  </td>
+  <td>${f(totalCost)}</td>
+</tr>
+
       </tbody>
     </table>
 
