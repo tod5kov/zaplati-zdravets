@@ -2,29 +2,29 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Заплати – Ведомост и фишове</title>
+<title>1Заплати – Ведомост и фишове</title>
 
 <style>
 body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
 h2,h3 { margin:8px 0; }
 .toolbar { margin:10px 0 15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-button, select { padding:6px 10px; border:1px solid #333; background:#fff; border-radius:6px; cursor:pointer; }
-button:hover { background:#eee; }
 
-table { border-collapse: collapse; width:100%; background:#fff; margin-top:6px; }
+button, select, input {
+  padding:6px 10px; border:1px solid #333;
+  background:#fff; border-radius:6px;
+}
+
+table { border-collapse: collapse; width:100%; background:#fff; }
 th,td { border:1px solid #000; padding:5px; font-size:12px; text-align:center; }
 th { background:#e8eef5; }
-input { width:95px; }
+input[type="number"] { width:90px; }
+input.name { width:160px; }
 
-.notice { font-size:12px; color:#333; margin:8px 0 12px; display:none; }
-.notice b { color:#b00020; }
-
-.fish { border:1px solid #000; padding:10px; margin:10px 0; page-break-inside:avoid; background:#fff; }
+.fish { border:1px solid #000; padding:10px; margin:10px 0; page-break-inside:avoid; }
 .cut { border-top:2px dashed #000; margin:12px 0; }
 
 @media print {
-  .toolbar, .archive, .no-print, .notice { display:none !important; }
+  .toolbar, .no-print { display:none !important; }
   body { background:#fff; padding:0; }
 }
 </style>
@@ -32,9 +32,14 @@ input { width:95px; }
 
 <body>
 
-<h2>Заплати – Еко комплекс „Здравец“</h2>
+<h2>Заплати</h2>
 
 <div class="toolbar">
+  <label>Обект:
+    <select id="objectSelect"></select>
+  </label>
+  <button id="btnAddObject">➕ Обект</button>
+
   <label>Месец:
     <select id="month">
       <option>Януари</option><option>Февруари</option><option>Март</option>
@@ -48,17 +53,10 @@ input { width:95px; }
     <input type="number" id="year" value="2025" style="width:80px;">
   </label>
 
-  <button type="button" onclick="addRow()">➕ Служител</button>
-  <button type="button" onclick="generateAll()">🔄 Генерирай</button>
-  <button type="button" onclick="exportPDF()">📄 PDF</button>
-  <button type="button" onclick="exportExcel()">📊 Excel</button>
+  <button id="btnAddRow">➕ Служител</button>
+  <button id="btnGenerate">🔄 Генерирай</button>
+  <button onclick="window.print()">🖨 Печат</button>
 </div>
-
-<div id="storageWarning" class="notice">
-  ⚠️ Авто-запазването е изключено, защото браузърът блокира localStorage (например Safari Private Mode).
-  Данните няма да се пазят след затваряне.
-</div>
-
 
 <table class="no-print">
 <thead>
@@ -81,51 +79,75 @@ input { width:95px; }
 const tbody = document.getElementById("tbody");
 const monthEl = document.getElementById("month");
 const yearEl  = document.getElementById("year");
-const archiveList = document.getElementById("archiveList");
-const warnEl = document.getElementById("storageWarning");
-
-const MONTHS = ["Януари","Февруари","Март","Април","Май","Юни","Юли","Август","Септември","Октомври","Ноември","Декември"];
-const monthIndex = (m) => Math.max(0, MONTHS.indexOf(m));
+const objectSelect = document.getElementById("objectSelect");
 
 const n = v => Number(v) || 0;
 const f = v => n(v).toFixed(2);
 
-function storageKey(m = monthEl.value, y = yearEl.value) {
-  return `zaplati_${y}_${m}`;
+/* ================= OBJECTS ================= */
+const OBJECTS_KEY = "zaplati_objects";
+
+function loadObjects() {
+  const raw = localStorage.getItem(OBJECTS_KEY);
+  let objs = raw ? JSON.parse(raw) : ["Еко комплекс Здравец"];
+  objectSelect.innerHTML = "";
+  objs.forEach(o => {
+    const opt = document.createElement("option");
+    opt.value = o;
+    opt.textContent = o;
+    objectSelect.appendChild(opt);
+  });
 }
 
-/* ================= SAFE STORAGE ================= */
-let STORAGE_OK = true;
-function storageSet(key, value) {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch (e) {
-    STORAGE_OK = false;
-    warnEl.style.display = "block";
-    return false;
-  }
-}
-function storageGet(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch (e) {
-    STORAGE_OK = false;
-    warnEl.style.display = "block";
-    return null;
-  }
-}
-function storageKeys() {
-  try {
-    return Object.keys(localStorage);
-  } catch (e) {
-    STORAGE_OK = false;
-    warnEl.style.display = "block";
-    return [];
-  }
+function addObject() {
+  const name = prompt("Име на обекта:");
+  if (!name) return;
+
+  const objs = JSON.parse(localStorage.getItem(OBJECTS_KEY) || "[]");
+  if (!objs.includes(name)) objs.push(name);
+  localStorage.setItem(OBJECTS_KEY, JSON.stringify(objs));
+
+  loadObjects();
+  objectSelect.value = name;
+  loadState();
 }
 
-/* ================= CALC ================= */
+/* ================= STORAGE ================= */
+function storageKey() {
+  return `zaplati_${objectSelect.value}_${yearEl.value}_${monthEl.value}`;
+}
+
+/* ================= ROW ================= */
+function addRow(prefill = {}) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+<td><input class="name" value="${prefill.name||""}"></td>
+<td><input class="osn" type="number" value="${prefill.osn||""}"></td>
+<td><input class="chm" type="number" value="${prefill.chm||""}"></td>
+<td><input class="otr" type="number" value="${prefill.otr||""}"></td>
+<td class="stavka">0.00</td>
+<td class="zap">0.00</td>
+<td><input class="dni" type="number" value="${prefill.dni||""}"></td>
+<td><input class="pden" type="number" value="${prefill.pden||""}"></td>
+<td class="patni">0.00</td>
+<td><input class="dob" type="number" value="${prefill.dob||0}"></td>
+<td class="obshto">0.00</td>
+<td><input class="av" type="number" value="${prefill.av||0}"></td>
+<td><input class="ud" type="number" value="${prefill.ud||0}"></td>
+<td class="ostatak">0.00</td>`;
+
+  tr.querySelectorAll("input").forEach(i =>
+    i.addEventListener("input", () => {
+      calc(tr);
+      saveState();
+    })
+  );
+
+  tbody.appendChild(tr);
+  calc(tr);
+  saveState();
+}
+
 function calc(tr) {
   const osn=n(tr.querySelector(".osn").value);
   const chm=n(tr.querySelector(".chm").value);
@@ -149,268 +171,80 @@ function calc(tr) {
   tr.querySelector(".ostatak").textContent=f(ostatak);
 }
 
-/* ================= ROW (two variants) ================= */
-function buildRow(prefill = {}) {
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-<td><input class="name" value="${prefill.name ?? ""}"></td>
-<td><input class="osn" type="number" value="${prefill.osn ?? ""}"></td>
-<td><input class="chm" type="number" value="${prefill.chm ?? ""}"></td>
-<td><input class="otr" type="number" value="${prefill.otr ?? ""}"></td>
-<td class="stavka">0.00</td>
-<td class="zap">0.00</td>
-<td><input class="dni" type="number" value="${prefill.dni ?? ""}"></td>
-<td><input class="pden" type="number" value="${prefill.pden ?? ""}"></td>
-<td class="patni">0.00</td>
-<td><input class="dob" type="number" value="${prefill.dob ?? 0}"></td>
-<td class="obshto">0.00</td>
-<td><input class="av" type="number" value="${prefill.av ?? 0}"></td>
-<td><input class="ud" type="number" value="${prefill.ud ?? 0}"></td>
-<td class="ostatak">0.00</td>`;
-  return tr;
-}
-
-// За потребителя: добавя ред + auto-save
-function addRow(prefill = {}) {
-  const tr = buildRow(prefill);
-
-  tr.querySelectorAll("input").forEach(i => {
-    i.addEventListener("input", () => {
-      calc(tr);
-      saveState();
-      renderArchive();
-    });
-  });
-
-  tbody.appendChild(tr);
-  calc(tr);
-  saveState();
-  renderArchive();
-}
-
-// Вътрешно: добавя ред без save/render (за load)
-function addRowSilent(prefill = {}) {
-  const tr = buildRow(prefill);
-
-  tr.querySelectorAll("input").forEach(i => {
-    i.addEventListener("input", () => {
-      calc(tr);
-      saveState();
-      renderArchive();
-    });
-  });
-
-  tbody.appendChild(tr);
-  calc(tr);
-}
-
 /* ================= SAVE / LOAD ================= */
-function collectRows() {
+function saveState() {
   const rows = [];
   tbody.querySelectorAll("tr").forEach(tr => {
     rows.push({
       name: tr.querySelector(".name").value,
-      osn:  tr.querySelector(".osn").value,
-      chm:  tr.querySelector(".chm").value,
-      otr:  tr.querySelector(".otr").value,
-      dni:  tr.querySelector(".dni").value,
+      osn: tr.querySelector(".osn").value,
+      chm: tr.querySelector(".chm").value,
+      otr: tr.querySelector(".otr").value,
+      dni: tr.querySelector(".dni").value,
       pden: tr.querySelector(".pden").value,
-      dob:  tr.querySelector(".dob").value,
-      av:   tr.querySelector(".av").value,
-      ud:   tr.querySelector(".ud").value
+      dob: tr.querySelector(".dob").value,
+      av: tr.querySelector(".av").value,
+      ud: tr.querySelector(".ud").value
     });
   });
-
-  // пазим само смислени редове
-  return rows.filter(r =>
-    (r.name || "").trim() !== "" ||
-    [r.osn,r.chm,r.otr,r.dni,r.pden,r.dob,r.av,r.ud].some(x => String(x||"").trim() !== "")
-  );
+  localStorage.setItem(storageKey(), JSON.stringify(rows));
 }
 
-function saveState() {
-  const payload = JSON.stringify({
-    month: monthEl.value,
-    year: yearEl.value,
-    employees: collectRows()
-  });
-  storageSet(storageKey(), payload);
-}
-
-function loadState(m = monthEl.value, y = yearEl.value) {
+function loadState() {
   tbody.innerHTML = "";
-
-  const raw = storageGet(storageKey(m,y));
-  if (raw) {
-    try {
-      const data = JSON.parse(raw);
-      (data.employees || []).forEach(emp => addRowSilent(emp));
-    } catch (e) { /* ignore */ }
-  }
-
-  // винаги поне един ред за въвеждане
-  if (tbody.children.length === 0) addRowSilent();
-
-  // След като заредим – записваме само ако storage работи, за да фиксираме структурата
-  if (STORAGE_OK) saveState();
+  const raw = localStorage.getItem(storageKey());
+  if (raw) JSON.parse(raw).forEach(e => addRow(e));
+  if (tbody.children.length === 0) addRow();
 }
 
 /* ================= OUTPUT ================= */
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-  }[c]));
-}
-
 function generateAll() {
-  // винаги преизчисляваме
   tbody.querySelectorAll("tr").forEach(calc);
-
   generateFishes();
   generateSummary();
-
-  document.getElementById("fishes").scrollIntoView({ behavior: "smooth" });
 }
 
 function generateFishes() {
   const box = document.getElementById("fishes");
-  box.innerHTML = `<h3>Фишове – ${monthEl.value} ${yearEl.value}</h3>`;
+  box.innerHTML = `<h3>Фишове – ${objectSelect.value} / ${monthEl.value} ${yearEl.value}</h3>`;
 
-  let count = 0;
   tbody.querySelectorAll("tr").forEach(tr => {
     const name = tr.querySelector(".name").value.trim();
     if (!name) return;
-    count++;
 
     box.innerHTML += `
 <div class="fish">
-<b>Служител:</b> ${escapeHtml(name)}<br>
+<b>Служител:</b> ${name}<br>
+<b>Обект:</b> ${objectSelect.value}<br>
 <b>Период:</b> ${monthEl.value} ${yearEl.value}<br>
-<b>Основна:</b> ${f(tr.querySelector(".osn").value)} лв.<br>
-<b>Пътни:</b> ${tr.querySelector(".patni").textContent} лв.<br>
-<b>Добавки:</b> ${f(tr.querySelector(".dob").value)} лв.<br>
-<b>Аванс:</b> ${f(tr.querySelector(".av").value)} лв.<br>
-<b>Удръжки:</b> ${f(tr.querySelector(".ud").value)} лв.<br>
 <hr>
 <b>ЗА ПОЛУЧАВАНЕ:</b> ${tr.querySelector(".ostatak").textContent} лв.
 </div>
 <div class="cut"></div>`;
   });
-
-  if (count === 0) {
-    box.innerHTML += `<p><i>Няма въведени служители (попълни име, после „Генерирай“).</i></p>`;
-  }
 }
 
 function generateSummary() {
-  let tOsn=0,tPat=0,tDob=0,tAv=0,tUd=0,tNet=0;
-  let rowsHtml = "";
-
-  tbody.querySelectorAll("tr").forEach(tr => {
-    const name = tr.querySelector(".name").value.trim();
-    if (!name) return;
-
-    const osn = n(tr.querySelector(".osn").value);
-    const pat = n(tr.querySelector(".patni").textContent);
-    const dob = n(tr.querySelector(".dob").value);
-    const av  = n(tr.querySelector(".av").value);
-    const ud  = n(tr.querySelector(".ud").value);
-    const net = n(tr.querySelector(".ostatak").textContent);
-
-    tOsn+=osn; tPat+=pat; tDob+=dob; tAv+=av; tUd+=ud; tNet+=net;
-
-    rowsHtml += `
-<tr>
-<td style="text-align:left;padding-left:8px;">${escapeHtml(name)}</td>
-<td>${f(osn)}</td>
-<td>${f(pat)}</td>
-<td>${f(dob)}</td>
-<td>${f(av)}</td>
-<td>${f(ud)}</td>
-<td>${f(net)}</td>
-</tr>`;
-  });
+  let total = 0;
+  tbody.querySelectorAll(".ostatak").forEach(c => total += n(c.textContent));
 
   document.getElementById("summary").innerHTML = `
-<h3>Обобщена ведомост – ${monthEl.value} ${yearEl.value}</h3>
-<table>
-<thead>
-<tr>
-<th style="text-align:left;padding-left:8px;">Служител</th>
-<th>Основна</th><th>Пътни</th><th>Добавки</th><th>Аванс</th><th>Удръжки</th><th>Нетно</th>
-</tr>
-</thead>
-<tbody>
-${rowsHtml || `<tr><td colspan="7"><i>Няма данни за обобщаване.</i></td></tr>`}
-<tr style="font-weight:bold;background:#eee;">
-<td style="text-align:left;padding-left:8px;">ОБЩО</td>
-<td>${f(tOsn)}</td><td>${f(tPat)}</td><td>${f(tDob)}</td>
-<td>${f(tAv)}</td><td>${f(tUd)}</td><td>${f(tNet)}</td>
-</tr>
-</tbody>
-</table>`;
-}
-
-/* ================= EXPORT ================= */
-function exportPDF() {
-  // PDF = печат -> Save as PDF
-  generateAll();
-  window.print();
-}
-
-function exportExcel() {
-  // Генерираме таблица за Excel като HTML (Excel отваря .xls отлично)
-  tbody.querySelectorAll("tr").forEach(calc);
-
-  let rows = "";
-  tbody.querySelectorAll("tr").forEach(tr => {
-    const name = tr.querySelector(".name").value.trim();
-    if (!name) return;
-
-    rows += `
-<tr>
-  <td>${escapeHtml(name)}</td>
-  <td>${f(tr.querySelector(".osn").value)}</td>
-  <td>${f(tr.querySelector(".patni").textContent)}</td>
-  <td>${f(tr.querySelector(".dob").value)}</td>
-  <td>${f(tr.querySelector(".av").value)}</td>
-  <td>${f(tr.querySelector(".ud").value)}</td>
-  <td>${f(tr.querySelector(".ostatak").textContent)}</td>
-</tr>`;
-  });
-
-  const html = `
-<html>
-<head><meta charset="UTF-8"></head>
-<body>
-  <h3>Заплати – ${monthEl.value} ${yearEl.value}</h3>
-  <table border="1">
-    <tr>
-      <th>Служител</th><th>Основна</th><th>Пътни</th><th>Добавки</th>
-      <th>Аванс</th><th>Удръжки</th><th>Нетно</th>
-    </tr>
-    ${rows || `<tr><td colspan="7">Няма данни</td></tr>`}
-  </table>
-</body>
-</html>`;
-
-  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `zaplati_${monthEl.value}_${yearEl.value}.xls`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+<h3>Обобщена ведомост – ${objectSelect.value}</h3>
+<b>Общо за изплащане: ${f(total)} лв.</b>`;
 }
 
 /* ================= EVENTS ================= */
-monthEl.addEventListener("change", () => { loadState(); renderArchive(); });
-yearEl.addEventListener("input",  () => { loadState(); renderArchive(); });
-window.addEventListener("beforeunload", () => saveState());
+document.getElementById("btnAddRow").addEventListener("click", addRow);
+document.getElementById("btnGenerate").addEventListener("click", generateAll);
+document.getElementById("btnAddObject").addEventListener("click", addObject);
+
+monthEl.addEventListener("change", loadState);
+yearEl.addEventListener("input", loadState);
+objectSelect.addEventListener("change", loadState);
 
 /* ================= INIT ================= */
+loadObjects();
 loadState();
-renderArchive();
 </script>
 
 </body>
