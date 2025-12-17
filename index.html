@@ -2,7 +2,7 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<title>Заплати – Ведомост и фишове</title>
+<title>1Заплати – Ведомост и фишове</title>
 
 <style>
 body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
@@ -200,16 +200,29 @@ function renderArchive() {
 
 /* ================= OUTPUT ================= */
 function generateAll() {
+  // винаги преизчисляваме всички редове
+  tbody.querySelectorAll("tr").forEach(calc);
+
   generateFishes();
   generateSummary();
+
+  // автоматично скролваме към фишовете
+  document.getElementById("fishes")
+    .scrollIntoView({ behavior: "smooth" });
 }
 
+
 function generateFishes() {
+  function generateFishes() {
   const box = document.getElementById("fishes");
-  box.innerHTML = `<h3>Фишове – ${monthEl.value} ${yearEl.value}</h3>`;
+
+  box.innerHTML = `
+    <h3>Фишове – ${monthEl.value} ${yearEl.value}</h3>
+    <p><i>Генерирани фишове:</i></p>
+  `;
   tbody.querySelectorAll("tr").forEach(tr => {
-    const name = tr.querySelector(".name").value;
-    if (!name) return;
+    const name = tr.querySelector(".name").value.trim();
+if (name === "") return;
     box.innerHTML += `
 <div class="fish">
 <b>${name}</b><br>
