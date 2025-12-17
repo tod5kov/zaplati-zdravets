@@ -9,11 +9,11 @@ body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
 h2,h3 { margin:8px 0; }
 
 .toolbar {
-  margin:10px 0 15px;
   display:flex;
   gap:8px;
   flex-wrap:wrap;
   align-items:center;
+  margin-bottom:15px;
 }
 
 button, select, input {
@@ -37,12 +37,10 @@ th,td {
 }
 
 th { background:#e8eef5; }
-
-tr.dragging { opacity: 0.4; }
-
 input[type="number"] { width:90px; }
-input.name { width:150px; }
-td.role { font-size:11px; color:#444; }
+input.name { width:140px; }
+
+tr.dragging { opacity:0.4; }
 
 .fish {
   border:1px solid #000;
@@ -72,12 +70,10 @@ td.role { font-size:11px; color:#444; }
   border-radius:8px;
 }
 
-.modal h3 { margin-top:0; }
 .modal ul { list-style:none; padding:0; }
-.modal li { margin:6px 0; }
 
 @media print {
-  .toolbar, .no-print, .modal { display:none !important; }
+  .toolbar, .modal { display:none !important; }
   body { background:#fff; padding:0; }
 }
 </style>
@@ -112,19 +108,19 @@ td.role { font-size:11px; color:#444; }
   <button id="btnGenerate">🔄 Генерирай</button>
 </div>
 
-<table class="no-print">
+<table>
 <thead>
 <tr>
 <th></th>
 <th>Име</th>
-<th>Длъжност</th>
+<th>Група</th>
+<th>Роля</th>
 <th>Основна</th>
 <th>Час/мес</th>
 <th>Отраб.</th>
 <th>Ставка</th>
 <th>Заплата</th>
 <th>Дни</th>
-<th>Пътни</th>
 <th>Добавки</th>
 <th>Остатък</th>
 </tr>
@@ -133,34 +129,45 @@ td.role { font-size:11px; color:#444; }
 </table>
 
 <div id="fishes"></div>
+<div id="summary"></div>
 
-<!-- ===== MODAL TEMPLATE ===== -->
+<!-- ===== MODAL ===== -->
 <div id="templateModal" class="modal">
   <div class="modal-content">
     <h3>Шаблон служители</h3>
     <ul id="templateList"></ul>
-    <button id="btnDeleteSelected">🗑 Изтрий избраните</button>
-    <button onclick="closeModal()">Затвори</button>
+    <button id="btnDeleteTemplate">🗑 Изтрий избраните</button>
+    <button id="btnCloseModal">Затвори</button>
   </div>
 </div>
 
 <script>
-/* ================= SETUP ================= */
+/* ===== ROLE RULES ===== */
+const ROLE_RULES = {
+  "Рецепционист": "hourly",
+  "Камериерка": "daily",
+  "Поддръжка": "fixed",
+  "Сезонен": "hourly"
+};
+
+/* ===== HELPERS ===== */
+const n = v => Number(v) || 0;
+const f = v => n(v).toFixed(2);
+
+/* ===== ELEMENTS ===== */
 const tbody = document.getElementById("tbody");
 const objectSelect = document.getElementById("objectSelect");
 const monthEl = document.getElementById("month");
 const yearEl = document.getElementById("year");
 
+/* ===== STORAGE KEYS ===== */
 const OBJECTS_KEY = "zaplati_objects";
 const STAFF_KEY = o => `zaplati_staff_${o}`;
+const DATA_KEY = () => `zaplati_${objectSelect.value}_${yearEl.value}_${monthEl.value}`;
 
-const n = v => Number(v) || 0;
-const f = v => n(v).toFixed(2);
-
-/* ================= OBJECTS ================= */
+/* ===== OBJECTS ===== */
 function loadObjects() {
-  const raw = localStorage.getItem(OBJECTS_KEY);
-  const objs = raw ? JSON.parse(raw) : ["Еко комплекс Здравец"];
+  const objs = JSON.parse(localStorage.getItem(OBJECTS_KEY) || '["Еко комплекс Здравец"]');
   objectSelect.innerHTML = "";
   objs.forEach(o => {
     const opt = document.createElement("option");
@@ -181,62 +188,56 @@ function addObject() {
   loadState();
 }
 
-/* ================= STAFF TEMPLATE ================= */
-function getStaffTemplate() {
+/* ===== TEMPLATE ===== */
+function getTemplate() {
   return JSON.parse(localStorage.getItem(STAFF_KEY(objectSelect.value)) || "[]");
 }
 
-function addStaffTemplate() {
+function addTemplateStaff() {
   const name = prompt("Име:");
   if (!name) return;
-  const role = prompt("Длъжност:");
-  const base = Number(prompt("Основна заплата:", "0")) || 0;
+  const group = prompt("Група (Рецепция / Домакинство):");
+  const role = prompt("Роля:");
+  if (!ROLE_RULES[role]) return alert("Непозната роля");
+  const base = n(prompt("Основна заплата:", "0"));
 
-  const staff = getStaffTemplate();
-  staff.push({ name, role, base });
+  const staff = getTemplate();
+  staff.push({ name, group, role, base });
   localStorage.setItem(STAFF_KEY(objectSelect.value), JSON.stringify(staff));
 }
 
 function openTemplateModal() {
   const list = document.getElementById("templateList");
   list.innerHTML = "";
-
-  getStaffTemplate().forEach((s, i) => {
-    const li = document.createElement("li");
-    li.innerHTML = `
-<label>
-  <input type="checkbox" value="${i}">
-  ${s.name} – ${s.role} (${s.base} лв.)
-</label>`;
+  getTemplate().forEach((s,i)=>{
+    const li=document.createElement("li");
+    li.innerHTML=`<label><input type="checkbox" value="${i}"> ${s.name} – ${s.group} – ${s.role}</label>`;
     list.appendChild(li);
   });
-
-  document.getElementById("templateModal").style.display = "flex";
+  document.getElementById("templateModal").style.display="flex";
 }
 
-function closeModal() {
-  document.getElementById("templateModal").style.display = "none";
-}
-
-function deleteSelectedTemplate() {
-  let staff = getStaffTemplate();
-  const checked = Array.from(
-    document.querySelectorAll("#templateList input:checked")
-  ).map(c => Number(c.value));
-
-  staff = staff.filter((_, i) => !checked.includes(i));
+function deleteTemplateStaff() {
+  let staff = getTemplate();
+  const checked = [...document.querySelectorAll("#templateList input:checked")]
+    .map(c=>Number(c.value));
+  staff = staff.filter((_,i)=>!checked.includes(i));
   localStorage.setItem(STAFF_KEY(objectSelect.value), JSON.stringify(staff));
   closeModal();
 }
 
-/* ================= ROW + DRAG ================= */
-function addRow(data = {}) {
-  const tr = document.createElement("tr");
-  tr.draggable = true;
+function closeModal() {
+  document.getElementById("templateModal").style.display="none";
+}
 
-  tr.innerHTML = `
+/* ===== ROWS ===== */
+function addRow(data={}) {
+  const tr=document.createElement("tr");
+  tr.draggable=true;
+  tr.innerHTML=`
 <td>::</td>
 <td><input class="name" value="${data.name||""}"></td>
+<td>${data.group||""}</td>
 <td class="role">${data.role||""}</td>
 <td><input type="number" class="osn" value="${data.base||""}"></td>
 <td><input type="number" class="chm"></td>
@@ -244,96 +245,101 @@ function addRow(data = {}) {
 <td class="stavka">0.00</td>
 <td class="zap">0.00</td>
 <td><input type="number" class="dni"></td>
-<td class="patni">0.00</td>
 <td><input type="number" class="dob" value="0"></td>
 <td class="ostatak">0.00</td>`;
-
-  tr.querySelectorAll("input").forEach(i =>
-    i.addEventListener("input", () => calc(tr))
-  );
-
-  addDragAndDrop(tr);
+  tr.querySelectorAll("input").forEach(i=>i.addEventListener("input",()=>calc(tr)));
+  enableDrag(tr);
   tbody.appendChild(tr);
   calc(tr);
 }
 
-function addDragAndDrop(tr) {
-  tr.addEventListener("dragstart", () => tr.classList.add("dragging"));
-  tr.addEventListener("dragend", () => tr.classList.remove("dragging"));
-  tbody.addEventListener("dragover", e => {
+function enableDrag(tr) {
+  tr.addEventListener("dragstart",()=>tr.classList.add("dragging"));
+  tr.addEventListener("dragend",()=>tr.classList.remove("dragging"));
+  tbody.addEventListener("dragover",e=>{
     e.preventDefault();
-    const after = [...tbody.querySelectorAll("tr:not(.dragging)")]
-      .find(r => e.clientY < r.getBoundingClientRect().top + r.offsetHeight / 2);
-    const dragging = tbody.querySelector(".dragging");
-    if (!dragging) return;
-    after ? tbody.insertBefore(dragging, after) : tbody.appendChild(dragging);
+    const after=[...tbody.querySelectorAll("tr:not(.dragging)")]
+      .find(r=>e.clientY<r.getBoundingClientRect().top+r.offsetHeight/2);
+    const d=tbody.querySelector(".dragging");
+    if(!d) return;
+    after?tbody.insertBefore(d,after):tbody.appendChild(d);
   });
 }
 
-/* ================= CALC ================= */
+/* ===== CALC ===== */
 function calc(tr) {
+  const role = tr.querySelector(".role").textContent;
+  const rule = ROLE_RULES[role];
+
   const osn=n(tr.querySelector(".osn").value);
   const chm=n(tr.querySelector(".chm").value);
   const otr=n(tr.querySelector(".otr").value);
   const dni=n(tr.querySelector(".dni").value);
   const dob=n(tr.querySelector(".dob").value);
 
-  const stavka = chm ? osn/chm : 0;
-  const zap = stavka * otr;
-  const patni = dni * 0;
-  const ostatak = zap + patni + dob;
+  let zap=0,stavka=0;
+
+  if(rule==="hourly") {
+    stavka=chm?osn/chm:0;
+    zap=stavka*otr;
+  }
+  if(rule==="daily") zap=dni*osn;
+  if(rule==="fixed") zap=osn;
+
+  zap+=dob;
 
   tr.querySelector(".stavka").textContent=f(stavka);
   tr.querySelector(".zap").textContent=f(zap);
-  tr.querySelector(".patni").textContent=f(patni);
-  tr.querySelector(".ostatak").textContent=f(ostatak);
+  tr.querySelector(".ostatak").textContent=f(zap);
 }
 
-/* ================= SAVE / LOAD ================= */
-function storageKey() {
-  return `zaplati_${objectSelect.value}_${yearEl.value}_${monthEl.value}`;
-}
-
+/* ===== SAVE / LOAD ===== */
 function saveState() {
-  const rows = [];
-  tbody.querySelectorAll("tr").forEach(tr => {
+  const rows=[];
+  tbody.querySelectorAll("tr").forEach(tr=>{
     rows.push({
-      name: tr.querySelector(".name").value,
-      role: tr.querySelector(".role").textContent,
-      base: tr.querySelector(".osn").value
+      name:tr.querySelector(".name").value,
+      group:tr.children[2].textContent,
+      role:tr.querySelector(".role").textContent,
+      base:tr.querySelector(".osn").value
     });
   });
-  localStorage.setItem(storageKey(), JSON.stringify(rows));
+  localStorage.setItem(DATA_KEY(),JSON.stringify(rows));
 }
 
 function loadState() {
-  tbody.innerHTML = "";
-  const raw = localStorage.getItem(storageKey());
-  if (raw) {
-    JSON.parse(raw).forEach(r => addRow(r));
-  } else {
-    getStaffTemplate().forEach(s => addRow(s));
-  }
+  tbody.innerHTML="";
+  const raw=localStorage.getItem(DATA_KEY());
+  if(raw) JSON.parse(raw).forEach(r=>addRow(r));
+  else getTemplate().forEach(s=>addRow(s));
 }
 
-/* ================= OUTPUT ================= */
+/* ===== OUTPUT ===== */
 function generateAll() {
-  tbody.querySelectorAll("tr").forEach(calc);
+  let total=0;
+  document.getElementById("fishes").innerHTML="";
+  tbody.querySelectorAll("tr").forEach(tr=>{
+    calc(tr);
+    total+=n(tr.querySelector(".ostatak").textContent);
+  });
+  document.getElementById("summary").innerHTML=
+    `<h3>Общо за изплащане: ${f(total)} лв.</h3>`;
 }
 
-/* ================= EVENTS ================= */
-document.getElementById("btnAddObject").addEventListener("click", addObject);
-document.getElementById("btnAddRow").addEventListener("click", () => addRow());
-document.getElementById("btnAddTemplate").addEventListener("click", addStaffTemplate);
-document.getElementById("btnEditTemplate").addEventListener("click", openTemplateModal);
-document.getElementById("btnDeleteSelected").addEventListener("click", deleteSelectedTemplate);
-document.getElementById("btnGenerate").addEventListener("click", generateAll);
+/* ===== EVENTS ===== */
+document.getElementById("btnAddObject").addEventListener("click",addObject);
+document.getElementById("btnAddRow").addEventListener("click",()=>addRow());
+document.getElementById("btnAddTemplate").addEventListener("click",addTemplateStaff);
+document.getElementById("btnEditTemplate").addEventListener("click",openTemplateModal);
+document.getElementById("btnDeleteTemplate").addEventListener("click",deleteTemplateStaff);
+document.getElementById("btnCloseModal").addEventListener("click",closeModal);
+document.getElementById("btnGenerate").addEventListener("click",generateAll);
 
-monthEl.addEventListener("change", loadState);
-yearEl.addEventListener("input", loadState);
-objectSelect.addEventListener("change", loadState);
+monthEl.addEventListener("change",loadState);
+yearEl.addEventListener("input",loadState);
+objectSelect.addEventListener("change",loadState);
 
-/* ================= INIT ================= */
+/* ===== INIT ===== */
 loadObjects();
 loadState();
 </script>
