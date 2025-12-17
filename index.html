@@ -78,30 +78,44 @@ input { width:95px; }
 <div id="summary" class="section"></div>
 
 <script>
+  
+document.getElementById("month")?.addEventListener("change", saveState);
+document.getElementById("year")?.addEventListener("input", saveState);
+
+  
 const tbody=document.querySelector("#table tbody");
 const n=v=>Number(v)||0;
 const f=v=>n(v).toFixed(2);
 
-function addRow(){
-  const tr=document.createElement("tr");
-  tr.innerHTML=`
-<td><input class="name"></td>
-<td><input class="osn" type="number"></td>
-<td><input class="chm" type="number"></td>
-<td><input class="otr" type="number"></td>
-<td class="stavka num">0.00</td>
-<td class="zap num">0.00</td>
-<td><input class="dni" type="number"></td>
-<td><input class="pden" type="number"></td>
-<td class="patni num">0.00</td>
-<td><input class="dob" type="number" value="0"></td>
-<td class="obshto num">0.00</td>
-<td><input class="av" type="number" value="0"></td>
-<td><input class="ud" type="number" value="0"></td>
-<td class="ostatak num">0.00</td>`;
-  tr.querySelectorAll("input").forEach(i=>i.oninput=()=>calc(tr));
+function addRow(prefill = {}) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+<td><input class="name" value="${prefill.name || ""}"></td>
+<td><input class="osn" type="number" value="${prefill.osn || ""}"></td>
+<td><input class="chm" type="number" value="${prefill.chm || ""}"></td>
+<td><input class="otr" type="number" value="${prefill.otr || ""}"></td>
+<td class="stavka">0.00</td>
+<td class="zap">0.00</td>
+<td><input class="dni" type="number" value="${prefill.dni || ""}"></td>
+<td><input class="pden" type="number" value="${prefill.pden || ""}"></td>
+<td class="patni">0.00</td>
+<td><input class="dob" type="number" value="${prefill.dob || 0}"></td>
+<td class="obshto">0.00</td>
+<td><input class="av" type="number" value="${prefill.av || 0}"></td>
+<td><input class="ud" type="number" value="${prefill.ud || 0}"></td>
+<td class="ostatak">0.00</td>`;
+
+  tr.querySelectorAll("input").forEach(i =>
+    i.oninput = () => {
+      calc(tr);
+      total();
+      saveState();   // ⬅ автоматично запазване
+    }
+  );
+
   tbody.appendChild(tr);
 }
+
 
 function calc(tr){
   const osn=n(tr.querySelector(".osn").value);
@@ -223,7 +237,62 @@ ${rows}
 </p>`;
 }
 
-addRow();
+const STORAGE_KEY = "zaplati_zdravets_v1";
+
+function saveState() {
+  const data = {
+    month: document.getElementById("month")?.value,
+    year: document.getElementById("year")?.value,
+    employees: []
+  };
+
+  document.querySelectorAll("tbody tr").forEach(tr => {
+    data.employees.push({
+      name: tr.querySelector(".name")?.value || "",
+      osn: tr.querySelector(".osn")?.value || "",
+      chm: tr.querySelector(".chm")?.value || "",
+      otr: tr.querySelector(".otr")?.value || "",
+      dni: tr.querySelector(".dni")?.value || "",
+      pden: tr.querySelector(".pden")?.value || "",
+      dob: tr.querySelector(".dob")?.value || "",
+      av:  tr.querySelector(".av")?.value || "",
+      ud:  tr.querySelector(".ud")?.value || ""
+    });
+  });
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+
+  const data = JSON.parse(raw);
+
+  if (data.month && document.getElementById("month")) {
+    document.getElementById("month").value = data.month;
+  }
+  if (data.year && document.getElementById("year")) {
+    document.getElementById("year").value = data.year;
+  }
+
+  tbody.innerHTML = "";
+
+  data.employees.forEach(emp => {
+    addRow(emp);
+  });
+
+  // преизчисляване след зареждане
+  document.querySelectorAll("tbody tr").forEach(calc);
+  total();
+}
+
+
+loadState();
+if (tbody.children.length === 0) {
+  addRow();
+}
+
 </script>
 
 </body>
