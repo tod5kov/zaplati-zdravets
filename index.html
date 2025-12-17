@@ -154,6 +154,7 @@
   <!-- ================== OUTPUT ================== -->
   <div id="fishes" class="section"></div>
   <div id="summary" class="section"></div>
+  <div id="accounting" class="section"></div>
 
   <!-- ================== TEMPLATE MANAGER MODAL ================== -->
   <div id="tplModal" class="modal">
@@ -745,12 +746,9 @@ const cost = salary + travel + bonus - deduct;
           <td>${f(totalRem)}</td>
         </tr>
         <tr style="font-weight:bold;background:#dfefff;">
-  <td colspan="3" style="text-align:left;padding-left:8px;">
-    ОБЩА СУМА ЗА ЗАПЛАТИ ЗА МЕСЕЦА
-  </td>
-  <td>${f(totalCost)}</td>
-</tr>
-
+          <td colspan="3" style="text-align:left;padding-left:8px;">ОБЩА СУМА ЗА ЗАПЛАТИ ЗА МЕСЕЦА</td>
+          <td>${f(totalCost)}</td>
+        </tr>
       </tbody>
     </table>
 
@@ -758,6 +756,88 @@ const cost = salary + travel + bonus - deduct;
       Съставил: ________________ &nbsp;&nbsp; Проверил: ________________
     </p>
   `;
+}
+
+  function generateAccountingReport() {
+  const obj = objectSelect.value;
+  const m = monthEl.value;
+  const y = yearEl.value;
+
+  let totalSalary = 0;
+  let totalTravel = 0;
+  let totalBonus = 0;
+  let totalDeduct = 0;
+
+  const byGroup = {};
+
+  tbody.querySelectorAll("tr").forEach(tr => {
+    const name = tr.querySelector(".name").value.trim();
+    if (!name) return;
+
+    const group = tr.querySelector(".group").textContent || "Без група";
+
+    const salary = n(tr.querySelector(".salary").textContent);
+    const travel = n(tr.querySelector(".travel").textContent);
+    const bonus = n(tr.querySelector(".bonus").value);
+    const deduct = n(tr.querySelector(".deduct").value);
+
+    totalSalary += salary;
+    totalTravel += travel;
+    totalBonus += bonus;
+    totalDeduct += deduct;
+
+    const cost = salary + travel + bonus - deduct;
+
+    if (!byGroup[group]) byGroup[group] = 0;
+    byGroup[group] += cost;
+  });
+
+  const totalCost =
+    totalSalary + totalTravel + totalBonus - totalDeduct;
+
+  // ===== HTML =====
+  let html = `
+    <h3>Счетоводна справка – персонал</h3>
+    <p>
+      <b>Обект:</b> ${obj}<br>
+      <b>Период:</b> ${m} ${y}
+    </p>
+
+    <table>
+      <tr><th>Показател</th><th>Сума (лв.)</th></tr>
+      <tr><td>Заплати</td><td>${f(totalSalary)}</td></tr>
+      <tr><td>Пътни разходи</td><td>${f(totalTravel)}</td></tr>
+      <tr><td>Добавки</td><td>${f(totalBonus)}</td></tr>
+      <tr><td>Удръжки</td><td>- ${f(totalDeduct)}</td></tr>
+      <tr style="font-weight:bold;background:#eef;">
+        <td>ОБЩ РАЗХОД ЗА ПЕРСОНАЛ</td>
+        <td>${f(totalCost)}</td>
+      </tr>
+    </table>
+
+    <h4 style="margin-top:14px;">Разход по групи</h4>
+    <table>
+      <tr><th>Група</th><th>Разход</th></tr>
+  `;
+
+  Object.keys(byGroup).forEach(g => {
+    html += `<tr><td>${g}</td><td>${f(byGroup[g])}</td></tr>`;
+  });
+
+  html += `
+      <tr style="font-weight:bold;background:#eef;">
+        <td>ОБЩО</td>
+        <td>${f(totalCost)}</td>
+      </tr>
+    </table>
+
+    <p style="margin-top:26px;">
+      Съставил: ________________ &nbsp;&nbsp;
+      Проверил: ________________
+    </p>
+  `;
+
+  document.getElementById("accounting").innerHTML = html;
 }
 
 /* ================= EVENTS ================= */
@@ -771,7 +851,10 @@ document.getElementById("btnLoadTemplate").addEventListener("click", () => {
 });
 
 document.getElementById("btnManageTemplate").addEventListener("click", openTplModal);
-document.getElementById("btnGenerate").addEventListener("click", generateAll);
+document.getElementById("btnGenerate").addEventListener("click", () => {
+  generateAll();
+  generateAccountingReport();
+});
 
 document.getElementById("btnPrint").addEventListener("click", () => {
   generateAll();
