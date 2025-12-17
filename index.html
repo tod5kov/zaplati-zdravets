@@ -2,26 +2,24 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<title>3Заплати – Ведомост и фишове</title>
+<title>Заплати – Ведомост и фишове</title>
 
 <style>
 body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
 h2,h3 { margin:6px 0; }
 .toolbar { margin:10px 0 15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 button { padding:6px 12px; border:1px solid #333; background:#fff; border-radius:6px; cursor:pointer; }
-button:hover { background:#eee; }
 
 table { border-collapse: collapse; width:100%; background:#fff; }
 th,td { border:1px solid #000; padding:5px; font-size:12px; text-align:center; }
 th { background:#e8eef5; }
 input { width:95px; }
 
-.fish { border:1px solid #000; padding:10px; margin-bottom:12px; }
+.fish { border:1px solid #000; padding:10px; margin:10px 0; }
 .cut { border-top:2px dashed #000; margin:12px 0; }
 
 @media print {
   .toolbar, .no-print { display:none !important; }
-  body { background:#fff; padding:0; }
 }
 </style>
 </head>
@@ -49,7 +47,7 @@ input { width:95px; }
   <button onclick="window.print()">🖨 Печат</button>
 </div>
 
-<table id="table" class="no-print">
+<table class="no-print">
 <thead>
 <tr>
 <th>Име</th><th>Основна</th><th>Час/мес</th><th>Отраб.</th>
@@ -59,166 +57,10 @@ input { width:95px; }
 <th>Аванс</th><th>Удръжки</th><th>Остатък</th>
 </tr>
 </thead>
-<tbody></tbody>
+<tbody id="tbody"></tbody>
 </table>
 
 <div id="fishes"></div>
 <div id="summary"></div>
 
 <script>
-/* ================= CONFIG ================= */
-function storageKey() {
-  return `zaplati_${year.value}_${month.value}`;
-}
-
-
-/* ================= HELPERS ================= */
-const tbody = document.querySelector("#table tbody");
-const n = v => Number(v) || 0;
-const f = v => n(v).toFixed(2);
-
-/* ================= CORE ================= */
-function addRow(prefill = {}) {
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-<td><input class="name" value="${prefill.name || ""}"></td>
-<td><input class="osn" type="number" value="${prefill.osn || ""}"></td>
-<td><input class="chm" type="number" value="${prefill.chm || ""}"></td>
-<td><input class="otr" type="number" value="${prefill.otr || ""}"></td>
-<td class="stavka">0.00</td>
-<td class="zap">0.00</td>
-<td><input class="dni" type="number" value="${prefill.dni || ""}"></td>
-<td><input class="pden" type="number" value="${prefill.pden || ""}"></td>
-<td class="patni">0.00</td>
-<td><input class="dob" type="number" value="${prefill.dob || 0}"></td>
-<td class="obshto">0.00</td>
-<td><input class="av" type="number" value="${prefill.av || 0}"></td>
-<td><input class="ud" type="number" value="${prefill.ud || 0}"></td>
-<td class="ostatak">0.00</td>`;
-
-  tr.querySelectorAll("input").forEach(i => {
-    i.addEventListener("input", () => {
-      calc(tr);
-      saveState();
-    });
-  });
-
-  tbody.appendChild(tr);
-  calc(tr);
-  saveState();
-}
-
-function calc(tr) {
-  const osn=n(tr.querySelector(".osn").value);
-  const chm=n(tr.querySelector(".chm").value);
-  const otr=n(tr.querySelector(".otr").value);
-  const dni=n(tr.querySelector(".dni").value);
-  const pden=n(tr.querySelector(".pden").value);
-  const dob=n(tr.querySelector(".dob").value);
-  const av=n(tr.querySelector(".av").value);
-  const ud=n(tr.querySelector(".ud").value);
-
-  const stavka = chm ? osn/chm : 0;
-  const zap = stavka * otr;
-  const patni = dni * pden;
-  const obshto = zap + patni + dob;
-  const ostatak = obshto - av - ud;
-
-  tr.querySelector(".stavka").textContent = f(stavka);
-  tr.querySelector(".zap").textContent = f(zap);
-  tr.querySelector(".patni").textContent = f(patni);
-  tr.querySelector(".obshto").textContent = f(obshto);
-  tr.querySelector(".ostatak").textContent = f(ostatak);
-}
-
-/* ================= SAVE / LOAD ================= */
-function saveState() {
-  const data = {
-    month: month.value,
-    year: year.value,
-    employees: []
-  };
-
-  tbody.querySelectorAll("tr").forEach(tr => {
-    data.employees.push({
-      name: tr.querySelector(".name").value,
-      osn: tr.querySelector(".osn").value,
-      chm: tr.querySelector(".chm").value,
-      otr: tr.querySelector(".otr").value,
-      dni: tr.querySelector(".dni").value,
-      pden: tr.querySelector(".pden").value,
-      dob: tr.querySelector(".dob").value,
-      av: tr.querySelector(".av").value,
-      ud: tr.querySelector(".ud").value
-    });
-  });
-
-  localStorage.setItem(storageKey(), JSON.stringify(data));
-}
-
-function loadState() {
-  const raw = localStorage.getItem(storageKey());
-  if (!raw) return;
-
-  const data = JSON.parse(raw);
-  function onPeriodChange() {
-  loadState();
-
-  // ако няма данни за този месец – започваме на чисто
-  if (tbody.children.length === 0) {
-    addRow();
-  }
-}
-
-month.addEventListener("change", onPeriodChange);
-year.addEventListener("input", onPeriodChange);
-
-
-  tbody.innerHTML = "";
-  data.employees.forEach(e => addRow(e));
-}
-
-/* ================= OUTPUT ================= */
-function generateAll() {
-  generateFishes();
-  generateSummary();
-}
-
-function generateFishes() {
-  const box = document.getElementById("fishes");
-  box.innerHTML = `<h3>Фишове – ${month.value} ${year.value}</h3>`;
-
-  tbody.querySelectorAll("tr").forEach(tr => {
-    const name = tr.querySelector(".name").value;
-    if (!name) return;
-
-    box.innerHTML += `
-<div class="fish">
-<b>${name}</b><br>
-Период: ${month.value} ${year.value}<br>
-За получаване: <b>${tr.querySelector(".ostatak").textContent} лв.</b>
-</div>
-<div class="cut"></div>`;
-  });
-}
-
-function generateSummary() {
-  let total = 0;
-  tbody.querySelectorAll(".ostatak").forEach(c => total += n(c.textContent));
-
-  document.getElementById("summary").innerHTML = `
-<h3>Обобщена ведомост</h3>
-<b>Общо за изплащане: ${f(total)} лв.</b>`;
-}
-
-/* ================= INIT ================= */
-month.addEventListener("change", saveState);
-year.addEventListener("input", saveState);
-window.addEventListener("beforeunload", saveState);
-
-loadState();
-if (tbody.children.length === 0) addRow();
-</script>
-
-</body>
-</html>
