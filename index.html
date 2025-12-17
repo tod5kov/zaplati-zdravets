@@ -67,7 +67,10 @@ input { width:95px; }
 
 <script>
 /* ================= CONFIG ================= */
-const STORAGE_KEY = "zaplati_zdravets_v2";
+function storageKey() {
+  return `zaplati_${year.value}_${month.value}`;
+}
+
 
 /* ================= HELPERS ================= */
 const tbody = document.querySelector("#table tbody");
@@ -150,16 +153,26 @@ function saveState() {
     });
   });
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(storageKey(), JSON.stringify(data));
 }
 
 function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = localStorage.getItem(storageKey());
   if (!raw) return;
 
   const data = JSON.parse(raw);
-  month.value = data.month;
-  year.value = data.year;
+  function onPeriodChange() {
+  loadState();
+
+  // ако няма данни за този месец – започваме на чисто
+  if (tbody.children.length === 0) {
+    addRow();
+  }
+}
+
+month.addEventListener("change", onPeriodChange);
+year.addEventListener("input", onPeriodChange);
+
 
   tbody.innerHTML = "";
   data.employees.forEach(e => addRow(e));
