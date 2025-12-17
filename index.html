@@ -111,7 +111,7 @@
 
   <div class="muted no-print">
     • Нетно = Заплата + Пътни + Добавки − Аванс − Удръжки<br>
-    • daily: Заплата = <b>Запл. дни × Запл. ставка/ден</b><br>
+    • Надник: Заплата = <b>Запл. дни × Запл. ставка/ден</b><br>
     • Пътни: Пътни = <b>Пътни дни × Пътни/ден</b><br>
     • Остатък = <b>Нетно − Платена заплата</b>
   </div>
@@ -240,14 +240,12 @@
 
 <script>
 /* ================= CONFIG ================= */
-const GROUPS = ["Рецепция","Домакинство","Ресторант","Поддръжка"];
+const GROUPS = ["Рецепция","Домакинство","Ресторант","Кухня"];
 
 const ROLE_RULES = {
-  "Рецепционист": "hourly",
-  "Администратор": "hourly",
-  "Камериерка": "daily",
-  "Поддръжка": "fixed",
-  "Сезонен": "hourly"
+  "Почасово": "hourly",
+  "Надник на ден": "daily",
+  "Фиксирана заплата": "fixed",
 };
 
 const OBJECTS_KEY = "zaplati_objects";
@@ -651,10 +649,13 @@ function generateFishes() {
       <div class="fish">
         <b>Служител:</b> ${esc(name)}<br>
         <b>Група:</b> ${esc(tr.querySelector(".group").textContent)}<br>
-        <b>Роля:</b> ${esc(tr.querySelector(".role").textContent)}<br>
         <b>Обект:</b> ${esc(obj)}<br>
         <b>Период:</b> ${esc(m)} ${esc(y)}<br>
         <hr>
+        <b>Отработени часове:</b> ${tr.querySelector(".hoursWorked").textContent} лв.<br>
+        <b>Надник на час:</b> ${tr.querySelector(".hourRate").textContent} лв.<br>
+        <b>Брой смени:</b> ${tr.querySelector(".salaryDays").textContent} лв.<br>
+        <b>Надник:</b> ${tr.querySelector(".salaryDayRate").textContent} лв.<br>
         <b>Заплата:</b> ${tr.querySelector(".salary").textContent} лв.<br>
         <b>Пътни:</b> ${tr.querySelector(".travel").textContent} лв.<br>
         <b>Добавки:</b> ${f(tr.querySelector(".bonus").value)} лв.<br>
