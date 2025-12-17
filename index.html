@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Заплати – Ведомост, фишове, шаблони</title>
+<title>1Заплати – Ведомост, фишове, шаблони</title>
 
 <style>
   body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
@@ -49,7 +49,7 @@
   .modal-content {
     background:#fff;
     padding:14px;
-    width:min(760px, 94vw);
+    width:min(820px, 94vw);
     max-height:86vh;
     overflow:auto;
     border-radius:10px;
@@ -110,8 +110,9 @@
   </div>
 
   <div class="muted no-print">
-    • Формули: <b>Нетно = Заплата + Пътни + Добавки − Аванс − Удръжки</b> <br>
-    • Роли: <b>hourly</b> (Основна/Часове×Отработени), <b>daily</b> (Дни×Ставка/ден), <b>fixed</b> (Основна).
+    • Нетно = Заплата + Пътни + Добавки − Аванс − Удръжки<br>
+    • daily: Заплата = <b>Запл. дни × Запл. ставка/ден</b><br>
+    • Пътни: Пътни = <b>Пътни дни × Пътни/ден</b> (независимо от ролята)
   </div>
 
   <!-- ================== MAIN TABLE ================== -->
@@ -122,14 +123,21 @@
         <th>Име</th>
         <th>Група</th>
         <th>Роля</th>
+
         <th>Основна</th>
         <th>Час/мес</th>
         <th>Отраб.</th>
         <th>Ставка/час</th>
+
+        <th>Запл. дни</th>
+        <th>Запл. ставка/ден</th>
+
         <th>Заплата</th>
-        <th>Дни</th>
-        <th>Ставка/ден</th>
+
+        <th>Пътни дни</th>
+        <th>Пътни/ден</th>
         <th>Пътни</th>
+
         <th>Добавки</th>
         <th>Аванс</th>
         <th>Удръжки</th>
@@ -147,7 +155,10 @@
   <div id="tplModal" class="modal">
     <div class="modal-content">
       <h3>Шаблон служители – <span id="tplObjectName"></span></h3>
-      <div class="muted">Добавяй/редактирай служители за текущия обект. При „Зареди шаблон“ се вкарват в таблицата.</div>
+      <div class="muted">
+        Шаблонът пази: Име, Група, Роля, Основна (за fixed/hourly) и Запл. ставка/ден (за daily).
+        Пътните са месечни и се попълват във ведомостта.
+      </div>
 
       <div class="modal-actions" style="justify-content:space-between;">
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -165,7 +176,7 @@
             <th>Група</th>
             <th>Роля</th>
             <th>Основна</th>
-            <th>Ставка/ден</th>
+            <th>Запл. ставка/ден</th>
             <th style="width:92px;">Действия</th>
           </tr>
         </thead>
@@ -199,19 +210,19 @@
         </div>
 
         <div>
-          <label>Основна заплата
+          <label>Основна заплата (за hourly/fixed)
             <input type="number" id="tplBase" value="0" />
           </label>
         </div>
 
         <div>
-          <label>Ставка/ден (за daily роли)
-            <input type="number" id="tplDayRate" value="0" />
+          <label>Запл. ставка/ден (само за daily)
+            <input type="number" id="tplSalaryDayRate" value="0" />
           </label>
         </div>
 
         <div class="muted" style="align-self:end;">
-          Ако ролята е <b>Камериерка</b> (daily) → използва <b>Дни × Ставка/ден</b>.
+          daily: Заплата = <b>Запл. дни × Запл. ставка/ден</b>
         </div>
       </div>
 
@@ -286,7 +297,7 @@ function addObject() {
 
 /* ================= TEMPLATE DATA ================= */
 function getTemplate(obj = objectSelect.value) {
-  // array of {name, group, role, base, dayRate}
+  // {name, group, role, base, salaryDayRate}
   return JSON.parse(localStorage.getItem(STAFF_KEY(obj)) || "[]");
 }
 
@@ -305,9 +316,9 @@ const tplName = document.getElementById("tplName");
 const tplGroup = document.getElementById("tplGroup");
 const tplRole = document.getElementById("tplRole");
 const tplBase = document.getElementById("tplBase");
-const tplDayRate = document.getElementById("tplDayRate");
+const tplSalaryDayRate = document.getElementById("tplSalaryDayRate");
 
-let tplEditIndex = null; // null = add new
+let tplEditIndex = null;
 
 function openTplModal() {
   tplObjectName.textContent = objectSelect.value;
@@ -322,7 +333,6 @@ function closeTplModal() {
 function openTplEditModal(index = null) {
   tplEditIndex = index;
 
-  // fill dropdowns
   tplGroup.innerHTML = GROUPS.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join("");
   tplRole.innerHTML = Object.keys(ROLE_RULES).map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
 
@@ -332,16 +342,16 @@ function openTplEditModal(index = null) {
     tplGroup.value = GROUPS[0] || "";
     tplRole.value = Object.keys(ROLE_RULES)[0] || "";
     tplBase.value = 0;
-    tplDayRate.value = 0;
+    tplSalaryDayRate.value = 0;
   } else {
     const list = getTemplate();
-    const item = list[index];
+    const item = list[index] || {};
     tplEditTitle.textContent = "Редакция служител (шаблон)";
-    tplName.value = item?.name || "";
-    tplGroup.value = item?.group || (GROUPS[0] || "");
-    tplRole.value = item?.role || (Object.keys(ROLE_RULES)[0] || "");
-    tplBase.value = n(item?.base);
-    tplDayRate.value = n(item?.dayRate);
+    tplName.value = item.name || "";
+    tplGroup.value = item.group || (GROUPS[0] || "");
+    tplRole.value = item.role || (Object.keys(ROLE_RULES)[0] || "");
+    tplBase.value = n(item.base);
+    tplSalaryDayRate.value = n(item.salaryDayRate);
   }
 
   tplEditModal.style.display = "flex";
@@ -360,7 +370,7 @@ function saveTplEdit() {
     group: tplGroup.value,
     role: tplRole.value,
     base: n(tplBase.value),
-    dayRate: n(tplDayRate.value)
+    salaryDayRate: n(tplSalaryDayRate.value)
   };
 
   const list = getTemplate();
@@ -400,7 +410,7 @@ function renderTplTable() {
       <td>${esc(s.group)}</td>
       <td>${esc(s.role)}</td>
       <td>${f(s.base)}</td>
-      <td>${f(s.dayRate)}</td>
+      <td>${f(s.salaryDayRate)}</td>
       <td>
         <button class="tpl-edit-btn" data-index="${i}">Редактирай</button>
       </td>
@@ -408,7 +418,6 @@ function renderTplTable() {
     tplTableBody.appendChild(tr);
   });
 
-  // bind edit buttons
   tplTableBody.querySelectorAll(".tpl-edit-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const idx = Number(e.currentTarget.getAttribute("data-index"));
@@ -431,13 +440,15 @@ function buildRow(prefill = {}) {
     <td><input type="number" class="base" value="${prefill.base ?? ""}"></td>
     <td><input type="number" class="hoursMonth" value="${prefill.hoursMonth ?? ""}"></td>
     <td><input type="number" class="hoursWorked" value="${prefill.hoursWorked ?? ""}"></td>
-
     <td class="hourRate">0.00</td>
+
+    <td><input type="number" class="salaryDays" value="${prefill.salaryDays ?? ""}"></td>
+    <td><input type="number" class="salaryDayRate" value="${prefill.salaryDayRate ?? 0}"></td>
+
     <td class="salary">0.00</td>
 
-    <td><input type="number" class="days" value="${prefill.days ?? ""}"></td>
-    <td><input type="number" class="dayRate" value="${prefill.dayRate ?? 0}"></td>
-
+    <td><input type="number" class="travelDays" value="${prefill.travelDays ?? ""}"></td>
+    <td><input type="number" class="travelDayRate" value="${prefill.travelDayRate ?? 0}"></td>
     <td class="travel">0.00</td>
 
     <td><input type="number" class="bonus" value="${prefill.bonus ?? 0}"></td>
@@ -489,8 +500,11 @@ function calcRow(tr) {
   const hoursMonth = n(tr.querySelector(".hoursMonth").value);
   const hoursWorked = n(tr.querySelector(".hoursWorked").value);
 
-  const days = n(tr.querySelector(".days").value);
-  const dayRate = n(tr.querySelector(".dayRate").value);
+  const salaryDays = n(tr.querySelector(".salaryDays").value);
+  const salaryDayRate = n(tr.querySelector(".salaryDayRate").value);
+
+  const travelDays = n(tr.querySelector(".travelDays").value);
+  const travelDayRate = n(tr.querySelector(".travelDayRate").value);
 
   const bonus = n(tr.querySelector(".bonus").value);
   const advance = n(tr.querySelector(".advance").value);
@@ -503,18 +517,12 @@ function calcRow(tr) {
     hourRate = hoursMonth ? base / hoursMonth : 0;
     salary = hourRate * hoursWorked;
   } else if (rule === "daily") {
-    // daily uses days * dayRate (base can be informational)
-    salary = days * dayRate;
+    salary = salaryDays * salaryDayRate;
   } else if (rule === "fixed") {
     salary = base;
   }
 
-  // Travel: days * (dayRateTravel?) – в тази ведомост Travel е "Дни × Ставка/ден"
-  // НО вече имаме "Ставка/ден" за daily. За пътни ще използваме същото поле? Не.
-  // За да върнем стария модел: Пътни = Дни × Ставка/ден (тук dayRate е "Ставка/ден (пътни)" за всички роли).
-  // За daily роли dayRate е и "ставка/ден за заплата". Ако искаш отделно поле за "пътни/ден", кажи – ще го разделя.
-  const travel = days * dayRate;
-
+  const travel = travelDays * travelDayRate;
   const net = salary + travel + bonus - advance - deduct;
 
   tr.querySelector(".hourRate").textContent = f(hourRate);
@@ -536,8 +544,11 @@ function collectState() {
       hoursMonth: tr.querySelector(".hoursMonth").value,
       hoursWorked: tr.querySelector(".hoursWorked").value,
 
-      days: tr.querySelector(".days").value,
-      dayRate: tr.querySelector(".dayRate").value,
+      salaryDays: tr.querySelector(".salaryDays").value,
+      salaryDayRate: tr.querySelector(".salaryDayRate").value,
+
+      travelDays: tr.querySelector(".travelDays").value,
+      travelDayRate: tr.querySelector(".travelDayRate").value,
 
       bonus: tr.querySelector(".bonus").value,
       advance: tr.querySelector(".advance").value,
@@ -550,9 +561,34 @@ function collectState() {
 function saveState() {
   try {
     localStorage.setItem(dataKey(), JSON.stringify(collectState()));
-  } catch (e) {
-    // ако някога localStorage се блокира – просто не крашваме
-  }
+  } catch (e) {}
+}
+
+function loadTemplateIntoTable() {
+  tbody.innerHTML = "";
+  const tpl = getTemplate();
+  if (tpl.length === 0) return;
+
+  tpl.forEach(s => {
+    addRow({
+      name: s.name,
+      group: s.group,
+      role: s.role,
+
+      base: s.base ?? 0,
+      salaryDayRate: s.salaryDayRate ?? 0,
+
+      // месечни полета да стартнат на 0/празно
+      hoursMonth: "",
+      hoursWorked: "",
+      salaryDays: "",
+      travelDays: "",
+      travelDayRate: 0,
+      bonus: 0,
+      advance: 0,
+      deduct: 0
+    });
+  });
 }
 
 function loadState() {
@@ -565,50 +601,19 @@ function loadState() {
     try {
       const rows = JSON.parse(raw);
       rows.forEach(r => tbody.appendChild(buildRow(r)));
-      // calc all
       tbody.querySelectorAll("tr").forEach(calcRow);
     } catch (e) {}
   } else {
     loadTemplateIntoTable();
   }
 
-  // винаги поне 1 ред
-  if (tbody.children.length === 0) {
-    addRow();
-  } else {
-    saveState();
-  }
-}
-
-function loadTemplateIntoTable() {
-  tbody.innerHTML = "";
-  const tpl = getTemplate();
-  if (tpl.length === 0) {
-    return; // ще добавим празен ред в loadState()
-  }
-
-  tpl.forEach(s => {
-    addRow({
-      name: s.name,
-      group: s.group,
-      role: s.role,
-      base: s.base ?? 0,
-      dayRate: s.dayRate ?? 0,
-      bonus: 0,
-      advance: 0,
-      deduct: 0,
-      hoursMonth: "",
-      hoursWorked: "",
-      days: "",
-    });
-  });
+  if (tbody.children.length === 0) addRow();
+  else saveState();
 }
 
 /* ================= OUTPUT: FISHES + SUMMARY ================= */
 function generateAll() {
-  // ensure all rows calculated
   tbody.querySelectorAll("tr").forEach(calcRow);
-
   generateFishes();
   generateSummary();
 }
@@ -621,7 +626,7 @@ function generateFishes() {
   let html = `<h3>Фишове – ${esc(obj)} / ${esc(m)} ${esc(y)}</h3>`;
   let count = 0;
 
-  tbody.querySelectorAll("tr").forEach((tr, i) => {
+  tbody.querySelectorAll("tr").forEach((tr) => {
     const name = (tr.querySelector(".name").value || "").trim();
     if (!name) return;
 
@@ -658,7 +663,6 @@ function generateSummary() {
   const m = monthEl.value;
   const y = yearEl.value;
 
-  // totals by group
   const byGroup = {};
   let totalNet = 0;
 
@@ -673,10 +677,8 @@ function generateSummary() {
     totalNet += net;
   });
 
-  // table per group
   const groups = Object.keys(byGroup).sort((a,b) => a.localeCompare(b, "bg"));
-
-  let groupRows = groups.length
+  const groupRows = groups.length
     ? groups.map(g => `<tr><td style="text-align:left;padding-left:8px;">${esc(g)}</td><td>${f(byGroup[g])}</td></tr>`).join("")
     : `<tr><td colspan="2"><i>Няма данни.</i></td></tr>`;
 
@@ -702,7 +704,7 @@ function generateSummary() {
   `;
 }
 
-/* ================= EVENTS (Atlas-safe) ================= */
+/* ================= EVENTS ================= */
 document.getElementById("btnAddObject").addEventListener("click", addObject);
 
 document.getElementById("btnAddRow").addEventListener("click", () => addRow());
@@ -722,21 +724,17 @@ document.getElementById("btnPrint").addEventListener("click", () => {
   window.print();
 });
 
-// Template modal buttons
 document.getElementById("btnTplClose").addEventListener("click", closeTplModal);
 document.getElementById("btnTplAdd").addEventListener("click", () => openTplEditModal(null));
 document.getElementById("btnTplDeleteSelected").addEventListener("click", deleteSelectedTpl);
 
-// Template edit modal buttons
 document.getElementById("btnTplSave").addEventListener("click", saveTplEdit);
 document.getElementById("btnTplCancel").addEventListener("click", closeTplEditModal);
 
-// period/object changes
 monthEl.addEventListener("change", loadState);
 yearEl.addEventListener("input", loadState);
 objectSelect.addEventListener("change", loadState);
 
-// Auto-save on exit
 window.addEventListener("beforeunload", saveState);
 
 /* ================= INIT ================= */
