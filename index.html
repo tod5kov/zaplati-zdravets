@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>1Заплати – Ведомост, фишове, шаблони</title>
+<title>Заплати – Ведомост, фишове, шаблони</title>
 
 <style>
   body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
@@ -112,7 +112,8 @@
   <div class="muted no-print">
     • Нетно = Заплата + Пътни + Добавки − Аванс − Удръжки<br>
     • daily: Заплата = <b>Запл. дни × Запл. ставка/ден</b><br>
-    • Пътни: Пътни = <b>Пътни дни × Пътни/ден</b> (независимо от ролята)
+    • Пътни: Пътни = <b>Пътни дни × Пътни/ден</b><br>
+    • Остатък = <b>Нетно − Платена заплата</b>
   </div>
 
   <!-- ================== MAIN TABLE ================== -->
@@ -141,7 +142,10 @@
         <th>Добавки</th>
         <th>Аванс</th>
         <th>Удръжки</th>
+
         <th>Нетно</th>
+        <th>Платена заплата</th>
+        <th>Остатък</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
@@ -157,7 +161,7 @@
       <h3>Шаблон служители – <span id="tplObjectName"></span></h3>
       <div class="muted">
         Шаблонът пази: Име, Група, Роля, Основна (за fixed/hourly) и Запл. ставка/ден (за daily).
-        Пътните са месечни и се попълват във ведомостта.
+        Пътните и плащанията са месечни и се попълват във ведомостта.
       </div>
 
       <div class="modal-actions" style="justify-content:space-between;">
@@ -411,9 +415,7 @@ function renderTplTable() {
       <td>${esc(s.role)}</td>
       <td>${f(s.base)}</td>
       <td>${f(s.salaryDayRate)}</td>
-      <td>
-        <button class="tpl-edit-btn" data-index="${i}">Редактирай</button>
-      </td>
+      <td><button class="tpl-edit-btn" data-index="${i}">Редактирай</button></td>
     `;
     tplTableBody.appendChild(tr);
   });
@@ -456,6 +458,9 @@ function buildRow(prefill = {}) {
     <td><input type="number" class="deduct" value="${prefill.deduct ?? 0}"></td>
 
     <td class="net">0.00</td>
+
+    <td><input type="number" class="paid" value="${prefill.paid ?? 0}"></td>
+    <td class="remaining">0.00</td>
   `;
 
   tr.querySelectorAll("input").forEach(inp => {
@@ -510,6 +515,8 @@ function calcRow(tr) {
   const advance = n(tr.querySelector(".advance").value);
   const deduct = n(tr.querySelector(".deduct").value);
 
+  const paid = n(tr.querySelector(".paid").value);
+
   let hourRate = 0;
   let salary = 0;
 
@@ -524,11 +531,13 @@ function calcRow(tr) {
 
   const travel = travelDays * travelDayRate;
   const net = salary + travel + bonus - advance - deduct;
+  const remaining = net - paid;
 
   tr.querySelector(".hourRate").textContent = f(hourRate);
   tr.querySelector(".salary").textContent = f(salary);
   tr.querySelector(".travel").textContent = f(travel);
   tr.querySelector(".net").textContent = f(net);
+  tr.querySelector(".remaining").textContent = f(remaining);
 }
 
 /* ================= SAVE / LOAD ================= */
@@ -552,7 +561,9 @@ function collectState() {
 
       bonus: tr.querySelector(".bonus").value,
       advance: tr.querySelector(".advance").value,
-      deduct: tr.querySelector(".deduct").value
+      deduct: tr.querySelector(".deduct").value,
+
+      paid: tr.querySelector(".paid").value
     });
   });
   return rows;
@@ -578,15 +589,18 @@ function loadTemplateIntoTable() {
       base: s.base ?? 0,
       salaryDayRate: s.salaryDayRate ?? 0,
 
-      // месечни полета да стартнат на 0/празно
       hoursMonth: "",
       hoursWorked: "",
       salaryDays: "",
+
       travelDays: "",
       travelDayRate: 0,
+
       bonus: 0,
       advance: 0,
-      deduct: 0
+      deduct: 0,
+
+      paid: 0
     });
   });
 }
@@ -646,7 +660,9 @@ function generateFishes() {
         <b>Аванс:</b> ${f(tr.querySelector(".advance").value)} лв.<br>
         <b>Удръжки:</b> ${f(tr.querySelector(".deduct").value)} лв.<br>
         <hr>
-        <b>ЗА ПОЛУЧАВАНЕ:</b> ${tr.querySelector(".net").textContent} лв.
+        <b>Нетно:</b> ${tr.querySelector(".net").textContent} лв.<br>
+        <b>Платено:</b> ${f(tr.querySelector(".paid").value)} лв.<br>
+        <b>Остатък:</b> ${tr.querySelector(".remaining").textContent} лв.
       </div>
       <div class="cut"></div>
     `;
@@ -663,8 +679,8 @@ function generateSummary() {
   const m = monthEl.value;
   const y = yearEl.value;
 
-  const byGroup = {};
-  let totalNet = 0;
+  const byGroup = {}; // { group: { net, paid, rem } }
+  let totalNet = 0, totalPaid = 0, totalRem = 0;
 
   tbody.querySelectorAll("tr").forEach(tr => {
     const name = (tr.querySelector(".name").value || "").trim();
@@ -672,28 +688,50 @@ function generateSummary() {
 
     const g = (tr.querySelector(".group").textContent || "Без група").trim() || "Без група";
     const net = n(tr.querySelector(".net").textContent);
+    const paid = n(tr.querySelector(".paid").value);
+    const rem = n(tr.querySelector(".remaining").textContent);
 
-    byGroup[g] = (byGroup[g] || 0) + net;
+    if (!byGroup[g]) byGroup[g] = { net: 0, paid: 0, rem: 0 };
+    byGroup[g].net += net;
+    byGroup[g].paid += paid;
+    byGroup[g].rem += rem;
+
     totalNet += net;
+    totalPaid += paid;
+    totalRem += rem;
   });
 
   const groups = Object.keys(byGroup).sort((a,b) => a.localeCompare(b, "bg"));
-  const groupRows = groups.length
-    ? groups.map(g => `<tr><td style="text-align:left;padding-left:8px;">${esc(g)}</td><td>${f(byGroup[g])}</td></tr>`).join("")
-    : `<tr><td colspan="2"><i>Няма данни.</i></td></tr>`;
+  const rows = groups.length
+    ? groups.map(g => `
+        <tr>
+          <td style="text-align:left;padding-left:8px;">${esc(g)}</td>
+          <td>${f(byGroup[g].net)}</td>
+          <td>${f(byGroup[g].paid)}</td>
+          <td>${f(byGroup[g].rem)}</td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="4"><i>Няма данни.</i></td></tr>`;
 
   summaryEl.innerHTML = `
     <h3>Обобщена ведомост – ${esc(obj)} / ${esc(m)} ${esc(y)}</h3>
 
     <table style="margin-top:6px;">
       <thead>
-        <tr><th style="text-align:left;padding-left:8px;">Група</th><th>Нетно за изплащане</th></tr>
+        <tr>
+          <th style="text-align:left;padding-left:8px;">Група</th>
+          <th>Нетно</th>
+          <th>Платено</th>
+          <th>Остатък</th>
+        </tr>
       </thead>
       <tbody>
-        ${groupRows}
+        ${rows}
         <tr style="font-weight:bold;background:#eee;">
           <td style="text-align:left;padding-left:8px;">ОБЩО</td>
           <td>${f(totalNet)}</td>
+          <td>${f(totalPaid)}</td>
+          <td>${f(totalRem)}</td>
         </tr>
       </tbody>
     </table>
@@ -706,7 +744,6 @@ function generateSummary() {
 
 /* ================= EVENTS ================= */
 document.getElementById("btnAddObject").addEventListener("click", addObject);
-
 document.getElementById("btnAddRow").addEventListener("click", () => addRow());
 
 document.getElementById("btnLoadTemplate").addEventListener("click", () => {
@@ -716,7 +753,6 @@ document.getElementById("btnLoadTemplate").addEventListener("click", () => {
 });
 
 document.getElementById("btnManageTemplate").addEventListener("click", openTplModal);
-
 document.getElementById("btnGenerate").addEventListener("click", generateAll);
 
 document.getElementById("btnPrint").addEventListener("click", () => {
