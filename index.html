@@ -7,24 +7,77 @@
 <style>
 body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
 h2,h3 { margin:8px 0; }
-.toolbar { margin:10px 0 15px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 
-button, select, input {
-  padding:6px 10px; border:1px solid #333;
-  background:#fff; border-radius:6px;
+.toolbar {
+  margin:10px 0 15px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
 }
 
-table { border-collapse: collapse; width:100%; background:#fff; }
-th,td { border:1px solid #000; padding:5px; font-size:12px; text-align:center; }
-th { background:#e8eef5; }
-input[type="number"] { width:90px; }
-input.name { width:160px; }
+button, select, input {
+  padding:6px 10px;
+  border:1px solid #333;
+  background:#fff;
+  border-radius:6px;
+}
 
-.fish { border:1px solid #000; padding:10px; margin:10px 0; page-break-inside:avoid; }
+table {
+  border-collapse: collapse;
+  width:100%;
+  background:#fff;
+}
+
+th,td {
+  border:1px solid #000;
+  padding:5px;
+  font-size:12px;
+  text-align:center;
+}
+
+th { background:#e8eef5; }
+
+tr.dragging { opacity: 0.4; }
+
+input[type="number"] { width:90px; }
+input.name { width:150px; }
+td.role { font-size:11px; color:#444; }
+
+.fish {
+  border:1px solid #000;
+  padding:10px;
+  margin:10px 0;
+  page-break-inside:avoid;
+}
+
 .cut { border-top:2px dashed #000; margin:12px 0; }
 
+/* ===== MODAL ===== */
+.modal {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.4);
+  align-items:center;
+  justify-content:center;
+}
+
+.modal-content {
+  background:#fff;
+  padding:15px;
+  width:420px;
+  max-height:80vh;
+  overflow:auto;
+  border-radius:8px;
+}
+
+.modal h3 { margin-top:0; }
+.modal ul { list-style:none; padding:0; }
+.modal li { margin:6px 0; }
+
 @media print {
-  .toolbar, .no-print { display:none !important; }
+  .toolbar, .no-print, .modal { display:none !important; }
   body { background:#fff; padding:0; }
 }
 </style>
@@ -54,35 +107,49 @@ input.name { width:160px; }
   </label>
 
   <button id="btnAddRow">➕ Служител</button>
-  <button id="btnAddStaffTemplate">➕ Служител (шаблон)</button>
-  <button id="btnLoadTemplate">🧩 Зареди шаблон</button>
-
+  <button id="btnAddTemplate">➕ Шаблон служител</button>
+  <button id="btnEditTemplate">✏️ Редакция шаблон</button>
   <button id="btnGenerate">🔄 Генерирай</button>
-  <button onclick="window.print()">🖨 Печат</button>
 </div>
 
 <table class="no-print">
 <thead>
 <tr>
-<th>Име</th><th>Основна</th><th>Час/мес</th><th>Отраб.</th>
-<th>Ставка</th><th>Заплата</th>
-<th>Дни</th><th>Пътни/ден</th><th>Пътни</th>
-<th>Добавки</th><th>Общо</th>
-<th>Аванс</th><th>Удръжки</th><th>Остатък</th>
+<th></th>
+<th>Име</th>
+<th>Длъжност</th>
+<th>Основна</th>
+<th>Час/мес</th>
+<th>Отраб.</th>
+<th>Ставка</th>
+<th>Заплата</th>
+<th>Дни</th>
+<th>Пътни</th>
+<th>Добавки</th>
+<th>Остатък</th>
 </tr>
 </thead>
 <tbody id="tbody"></tbody>
 </table>
 
 <div id="fishes"></div>
-<div id="summary"></div>
+
+<!-- ===== MODAL TEMPLATE ===== -->
+<div id="templateModal" class="modal">
+  <div class="modal-content">
+    <h3>Шаблон служители</h3>
+    <ul id="templateList"></ul>
+    <button id="btnDeleteSelected">🗑 Изтрий избраните</button>
+    <button onclick="closeModal()">Затвори</button>
+  </div>
+</div>
 
 <script>
 /* ================= SETUP ================= */
 const tbody = document.getElementById("tbody");
-const monthEl = document.getElementById("month");
-const yearEl  = document.getElementById("year");
 const objectSelect = document.getElementById("objectSelect");
+const monthEl = document.getElementById("month");
+const yearEl = document.getElementById("year");
 
 const OBJECTS_KEY = "zaplati_objects";
 const STAFF_KEY = o => `zaplati_staff_${o}`;
@@ -106,19 +173,12 @@ function loadObjects() {
 function addObject() {
   const name = prompt("Име на обекта:");
   if (!name) return;
-
   const objs = JSON.parse(localStorage.getItem(OBJECTS_KEY) || "[]");
   if (!objs.includes(name)) objs.push(name);
   localStorage.setItem(OBJECTS_KEY, JSON.stringify(objs));
-
   loadObjects();
   objectSelect.value = name;
   loadState();
-}
-
-/* ================= STORAGE ================= */
-function storageKey() {
-  return `zaplati_${objectSelect.value}_${yearEl.value}_${monthEl.value}`;
 }
 
 /* ================= STAFF TEMPLATE ================= */
@@ -126,90 +186,121 @@ function getStaffTemplate() {
   return JSON.parse(localStorage.getItem(STAFF_KEY(objectSelect.value)) || "[]");
 }
 
-function addStaffToTemplate() {
-  const name = prompt("Име на служителя (шаблон):");
+function addStaffTemplate() {
+  const name = prompt("Име:");
   if (!name) return;
+  const role = prompt("Длъжност:");
+  const base = Number(prompt("Основна заплата:", "0")) || 0;
 
   const staff = getStaffTemplate();
-  if (!staff.includes(name)) staff.push(name);
+  staff.push({ name, role, base });
   localStorage.setItem(STAFF_KEY(objectSelect.value), JSON.stringify(staff));
 }
 
-function loadTemplateIntoTable() {
-  const staff = getStaffTemplate();
-  if (staff.length === 0) {
-    alert("Няма шаблон служители за този обект.");
-    return;
-  }
+function openTemplateModal() {
+  const list = document.getElementById("templateList");
+  list.innerHTML = "";
 
-  tbody.innerHTML = "";
-  staff.forEach(name => addRow({ name }));
+  getStaffTemplate().forEach((s, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+<label>
+  <input type="checkbox" value="${i}">
+  ${s.name} – ${s.role} (${s.base} лв.)
+</label>`;
+    list.appendChild(li);
+  });
+
+  document.getElementById("templateModal").style.display = "flex";
 }
 
-/* ================= ROW ================= */
-function addRow(prefill = {}) {
+function closeModal() {
+  document.getElementById("templateModal").style.display = "none";
+}
+
+function deleteSelectedTemplate() {
+  let staff = getStaffTemplate();
+  const checked = Array.from(
+    document.querySelectorAll("#templateList input:checked")
+  ).map(c => Number(c.value));
+
+  staff = staff.filter((_, i) => !checked.includes(i));
+  localStorage.setItem(STAFF_KEY(objectSelect.value), JSON.stringify(staff));
+  closeModal();
+}
+
+/* ================= ROW + DRAG ================= */
+function addRow(data = {}) {
   const tr = document.createElement("tr");
+  tr.draggable = true;
+
   tr.innerHTML = `
-<td><input class="name" value="${prefill.name||""}"></td>
-<td><input class="osn" type="number"></td>
-<td><input class="chm" type="number"></td>
-<td><input class="otr" type="number"></td>
+<td>::</td>
+<td><input class="name" value="${data.name||""}"></td>
+<td class="role">${data.role||""}</td>
+<td><input type="number" class="osn" value="${data.base||""}"></td>
+<td><input type="number" class="chm"></td>
+<td><input type="number" class="otr"></td>
 <td class="stavka">0.00</td>
 <td class="zap">0.00</td>
-<td><input class="dni" type="number"></td>
-<td><input class="pden" type="number"></td>
+<td><input type="number" class="dni"></td>
 <td class="patni">0.00</td>
-<td><input class="dob" type="number" value="0"></td>
-<td class="obshto">0.00</td>
-<td><input class="av" type="number" value="0"></td>
-<td><input class="ud" type="number" value="0"></td>
+<td><input type="number" class="dob" value="0"></td>
 <td class="ostatak">0.00</td>`;
 
   tr.querySelectorAll("input").forEach(i =>
     i.addEventListener("input", () => calc(tr))
   );
 
+  addDragAndDrop(tr);
   tbody.appendChild(tr);
   calc(tr);
 }
 
+function addDragAndDrop(tr) {
+  tr.addEventListener("dragstart", () => tr.classList.add("dragging"));
+  tr.addEventListener("dragend", () => tr.classList.remove("dragging"));
+  tbody.addEventListener("dragover", e => {
+    e.preventDefault();
+    const after = [...tbody.querySelectorAll("tr:not(.dragging)")]
+      .find(r => e.clientY < r.getBoundingClientRect().top + r.offsetHeight / 2);
+    const dragging = tbody.querySelector(".dragging");
+    if (!dragging) return;
+    after ? tbody.insertBefore(dragging, after) : tbody.appendChild(dragging);
+  });
+}
+
+/* ================= CALC ================= */
 function calc(tr) {
   const osn=n(tr.querySelector(".osn").value);
   const chm=n(tr.querySelector(".chm").value);
   const otr=n(tr.querySelector(".otr").value);
   const dni=n(tr.querySelector(".dni").value);
-  const pden=n(tr.querySelector(".pden").value);
   const dob=n(tr.querySelector(".dob").value);
-  const av=n(tr.querySelector(".av").value);
-  const ud=n(tr.querySelector(".ud").value);
 
   const stavka = chm ? osn/chm : 0;
   const zap = stavka * otr;
-  const patni = dni * pden;
-  const obshto = zap + patni + dob;
-  const ostatak = obshto - av - ud;
+  const patni = dni * 0;
+  const ostatak = zap + patni + dob;
 
   tr.querySelector(".stavka").textContent=f(stavka);
   tr.querySelector(".zap").textContent=f(zap);
   tr.querySelector(".patni").textContent=f(patni);
-  tr.querySelector(".obshto").textContent=f(obshto);
   tr.querySelector(".ostatak").textContent=f(ostatak);
 }
 
 /* ================= SAVE / LOAD ================= */
+function storageKey() {
+  return `zaplati_${objectSelect.value}_${yearEl.value}_${monthEl.value}`;
+}
+
 function saveState() {
   const rows = [];
   tbody.querySelectorAll("tr").forEach(tr => {
     rows.push({
       name: tr.querySelector(".name").value,
-      osn: tr.querySelector(".osn").value,
-      chm: tr.querySelector(".chm").value,
-      otr: tr.querySelector(".otr").value,
-      dni: tr.querySelector(".dni").value,
-      pden: tr.querySelector(".pden").value,
-      dob: tr.querySelector(".dob").value,
-      av: tr.querySelector(".av").value,
-      ud: tr.querySelector(".ud").value
+      role: tr.querySelector(".role").textContent,
+      base: tr.querySelector(".osn").value
     });
   });
   localStorage.setItem(storageKey(), JSON.stringify(rows));
@@ -221,50 +312,21 @@ function loadState() {
   if (raw) {
     JSON.parse(raw).forEach(r => addRow(r));
   } else {
-    loadTemplateIntoTable();
+    getStaffTemplate().forEach(s => addRow(s));
   }
 }
 
 /* ================= OUTPUT ================= */
 function generateAll() {
   tbody.querySelectorAll("tr").forEach(calc);
-  generateFishes();
-  generateSummary();
-}
-
-function generateFishes() {
-  const box = document.getElementById("fishes");
-  box.innerHTML = `<h3>Фишове – ${objectSelect.value}</h3>`;
-
-  tbody.querySelectorAll("tr").forEach(tr => {
-    const name = tr.querySelector(".name").value.trim();
-    if (!name) return;
-
-    box.innerHTML += `
-<div class="fish">
-<b>Служител:</b> ${name}<br>
-<b>Обект:</b> ${objectSelect.value}<br>
-<b>Период:</b> ${monthEl.value} ${yearEl.value}<br>
-<hr>
-<b>ЗА ПОЛУЧАВАНЕ:</b> ${tr.querySelector(".ostatak").textContent} лв.
-</div>
-<div class="cut"></div>`;
-  });
-}
-
-function generateSummary() {
-  let total = 0;
-  tbody.querySelectorAll(".ostatak").forEach(c => total += n(c.textContent));
-  document.getElementById("summary").innerHTML =
-    `<h3>Обобщена ведомост – ${objectSelect.value}</h3>
-     <b>Общо за изплащане: ${f(total)} лв.</b>`;
 }
 
 /* ================= EVENTS ================= */
 document.getElementById("btnAddObject").addEventListener("click", addObject);
 document.getElementById("btnAddRow").addEventListener("click", () => addRow());
-document.getElementById("btnAddStaffTemplate").addEventListener("click", addStaffToTemplate);
-document.getElementById("btnLoadTemplate").addEventListener("click", loadTemplateIntoTable);
+document.getElementById("btnAddTemplate").addEventListener("click", addStaffTemplate);
+document.getElementById("btnEditTemplate").addEventListener("click", openTemplateModal);
+document.getElementById("btnDeleteSelected").addEventListener("click", deleteSelectedTemplate);
 document.getElementById("btnGenerate").addEventListener("click", generateAll);
 
 monthEl.addEventListener("change", loadState);
