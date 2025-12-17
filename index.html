@@ -2,25 +2,30 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<title>Заплати – Ведомост и фишове</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>1Заплати – Ведомост и фишове</title>
 
 <style>
 body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
 h2,h3 { margin:8px 0; }
 .toolbar { margin:10px 0 15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-
 button { padding:6px 12px; border:1px solid #333; background:#fff; border-radius:6px; cursor:pointer; }
+button:hover { background:#eee; }
 
 table { border-collapse: collapse; width:100%; background:#fff; }
 th,td { border:1px solid #000; padding:5px; font-size:12px; text-align:center; }
 th { background:#e8eef5; }
 input { width:95px; }
 
-.fish { border:1px solid #000; padding:10px; margin:10px 0; page-break-inside:avoid; }
+.notice { font-size:12px; color:#333; margin:8px 0 12px; }
+.notice b { color:#b00020; }
+
+.fish { border:1px solid #000; padding:10px; margin:10px 0; page-break-inside:avoid; background:#fff; }
 .cut { border-top:2px dashed #000; margin:12px 0; }
 
 @media print {
-  .toolbar, .no-print { display:none !important; }
+  .toolbar, .no-print, .notice { display:none !important; }
+  body { background:#fff; padding:0; }
 }
 </style>
 </head>
@@ -43,9 +48,14 @@ input { width:95px; }
     <input type="number" id="year" value="2025" style="width:80px;">
   </label>
 
-  <button onclick="addRow()">➕ Служител</button>
-  <button onclick="generateAll()">🔄 Генерирай документи</button>
-  <button onclick="window.print()">🖨 Печат</button>
+  <button type="button" onclick="addRow()">➕ Служител</button>
+  <button type="button" onclick="generateAll()">🔄 Генерирай документи</button>
+  <button type="button" onclick="window.print()">🖨 Печат</button>
+</div>
+
+<div id="storageWarning" class="notice" style="display:none;">
+  ⚠️ Авто-запазването е изключено, защото браузърът блокира localStorage (напр. Safari Private Mode).
+  Данните ще се губят при затваряне. Отвори файла в нормален прозорец или използвай Chrome.
 </div>
 
 <table class="no-print">
@@ -68,19 +78,240 @@ input { width:95px; }
 /* ================= SETUP ================= */
 const tbody = document.getElementById("tbody");
 const monthEl = document.getElementById("month");
-const yearEl = document.getElementById("year");
+const yearEl  = document.getElementById("year");
+const warnEl  = document.getElementById("storageWarning");
 
 const n = v => Number(v) || 0;
 const f = v => n(v).toFixed(2);
 
-/* ================= STORAGE ================= */
+/* ================= SAFE STORAGE ================= */
+let STORAGE_OK = true;
+
 function storageKey() {
   return `zaplati_${yearEl.value}_${monthEl.value}`;
+}
+
+function storageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    STORAGE_OK = false;
+    warnEl.style.display = "block";
+    return false;
+  }
+}
+
+function storageGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    STORAGE_OK = false;
+    warnEl.style.display = "block";
+    return null;
+  }
 }
 
 /* ================= ROW ================= */
 function addRow(prefill = {}) {
   const tr = document.createElement("tr");
   tr.innerHTML = `
-<td><input class="name" value="${prefill.name||""}"></td>
-<td><input class="osn" type="number
+<td><input class="name" value="${prefill.name ?? ""}"></td>
+<td><input class="osn" type="number" value="${prefill.osn ?? ""}"></td>
+<td><input class="chm" type="number" value="${prefill.chm ?? ""}"></td>
+<td><input class="otr" type="number" value="${prefill.otr ?? ""}"></td>
+<td class="stavka">0.00</td>
+<td class="zap">0.00</td>
+<td><input class="dni" type="number" value="${prefill.dni ?? ""}"></td>
+<td><input class="pden" type="number" value="${prefill.pden ?? ""}"></td>
+<td class="patni">0.00</td>
+<td><input class="dob" type="number" value="${prefill.dob ?? 0}"></td>
+<td class="obshto">0.00</td>
+<td><input class="av" type="number" value="${prefill.av ?? 0}"></td>
+<td><input class="ud" type="number" value="${prefill.ud ?? 0}"></td>
+<td class="ostatak">0.00</td>`;
+
+  tr.querySelectorAll("input").forEach(i => {
+    i.addEventListener("input", () => {
+      calc(tr);
+      saveState();
+    });
+  });
+
+  tbody.appendChild(tr);
+  calc(tr);
+  saveState(); // safe — вече е в try/catch
+}
+
+/* ================= CALC ================= */
+function calc(tr) {
+  const osn=n(tr.querySelector(".osn").value);
+  const chm=n(tr.querySelector(".chm").value);
+  const otr=n(tr.querySelector(".otr").value);
+  const dni=n(tr.querySelector(".dni").value);
+  const pden=n(tr.querySelector(".pden").value);
+  const dob=n(tr.querySelector(".dob").value);
+  const av=n(tr.querySelector(".av").value);
+  const ud=n(tr.querySelector(".ud").value);
+
+  const stavka = chm ? osn/chm : 0;
+  const zap = stavka * otr;
+  const patni = dni * pden;
+  const obshto = zap + patni + dob;
+  const ostatak = obshto - av - ud;
+
+  tr.querySelector(".stavka").textContent = f(stavka);
+  tr.querySelector(".zap").textContent    = f(zap);
+  tr.querySelector(".patni").textContent  = f(patni);
+  tr.querySelector(".obshto").textContent = f(obshto);
+  tr.querySelector(".ostatak").textContent= f(ostatak);
+}
+
+/* ================= SAVE / LOAD ================= */
+function saveState() {
+  const rows = [];
+  tbody.querySelectorAll("tr").forEach(tr => {
+    rows.push({
+      name: tr.querySelector(".name").value,
+      osn:  tr.querySelector(".osn").value,
+      chm:  tr.querySelector(".chm").value,
+      otr:  tr.querySelector(".otr").value,
+      dni:  tr.querySelector(".dni").value,
+      pden: tr.querySelector(".pden").value,
+      dob:  tr.querySelector(".dob").value,
+      av:   tr.querySelector(".av").value,
+      ud:   tr.querySelector(".ud").value
+    });
+  });
+
+  // Пазим само редове с поне нещо (за да не се трупат празни)
+  const filtered = rows.filter(r =>
+    (r.name || "").trim() !== "" ||
+    [r.osn,r.chm,r.otr,r.dni,r.pden,r.dob,r.av,r.ud].some(x => String(x||"").trim() !== "")
+  );
+
+  const payload = JSON.stringify({
+    month: monthEl.value,
+    year: yearEl.value,
+    employees: filtered
+  });
+
+  storageSet(storageKey(), payload);
+}
+
+function loadState() {
+  tbody.innerHTML = "";
+
+  const raw = storageGet(storageKey());
+  if (raw) {
+    try {
+      const data = JSON.parse(raw);
+      (data.employees || []).forEach(emp => addRow(emp));
+    } catch (e) {
+      // ако има счупени данни, започваме празно
+    }
+  }
+
+  // ВИНАГИ поне 1 ред за писане
+  if (tbody.children.length === 0) addRow();
+}
+
+/* ================= OUTPUT ================= */
+function generateAll() {
+  generateFishes();
+  generateSummary();
+}
+
+function generateFishes() {
+  const box = document.getElementById("fishes");
+  box.innerHTML = `<h3>Фишове – ${monthEl.value} ${yearEl.value}</h3>`;
+
+  tbody.querySelectorAll("tr").forEach(tr => {
+    const name = tr.querySelector(".name").value.trim();
+    if (!name) return;
+
+    box.innerHTML += `
+<div class="fish">
+<b>Служител:</b> ${escapeHtml(name)}<br>
+<b>Период:</b> ${monthEl.value} ${yearEl.value}<br>
+<b>Основна:</b> ${f(tr.querySelector(".osn").value)} лв.<br>
+<b>Пътни:</b> ${tr.querySelector(".patni").textContent} лв.<br>
+<b>Добавки:</b> ${f(tr.querySelector(".dob").value)} лв.<br>
+<b>Аванс:</b> ${f(tr.querySelector(".av").value)} лв.<br>
+<b>Удръжки:</b> ${f(tr.querySelector(".ud").value)} лв.<br>
+<hr>
+<b>ЗА ПОЛУЧАВАНЕ:</b> ${tr.querySelector(".ostatak").textContent} лв.
+</div>
+<div class="cut"></div>`;
+  });
+}
+
+function generateSummary() {
+  let tOsn=0,tPat=0,tDob=0,tAv=0,tUd=0,tNet=0;
+  let rowsHtml = "";
+
+  tbody.querySelectorAll("tr").forEach(tr => {
+    const name = tr.querySelector(".name").value.trim();
+    if (!name) return;
+
+    const osn = n(tr.querySelector(".osn").value);
+    const pat = n(tr.querySelector(".patni").textContent);
+    const dob = n(tr.querySelector(".dob").value);
+    const av  = n(tr.querySelector(".av").value);
+    const ud  = n(tr.querySelector(".ud").value);
+    const net = n(tr.querySelector(".ostatak").textContent);
+
+    tOsn+=osn; tPat+=pat; tDob+=dob; tAv+=av; tUd+=ud; tNet+=net;
+
+    rowsHtml += `
+<tr>
+<td style="text-align:left;padding-left:8px;">${escapeHtml(name)}</td>
+<td>${f(osn)}</td>
+<td>${f(pat)}</td>
+<td>${f(dob)}</td>
+<td>${f(av)}</td>
+<td>${f(ud)}</td>
+<td>${f(net)}</td>
+</tr>`;
+  });
+
+  document.getElementById("summary").innerHTML = `
+<h3>Обобщена ведомост – ${monthEl.value} ${yearEl.value}</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left;padding-left:8px;">Служител</th>
+<th>Основна</th><th>Пътни</th><th>Добавки</th><th>Аванс</th><th>Удръжки</th><th>Нетно</th>
+</tr>
+</thead>
+<tbody>
+${rowsHtml}
+<tr style="font-weight:bold;background:#eee;">
+<td style="text-align:left;padding-left:8px;">ОБЩО</td>
+<td>${f(tOsn)}</td><td>${f(tPat)}</td><td>${f(tDob)}</td>
+<td>${f(tAv)}</td><td>${f(tUd)}</td><td>${f(tNet)}</td>
+</tr>
+</tbody>
+</table>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+}
+
+/* ================= EVENTS ================= */
+// Смяна на период -> зареждаме данните за този месец (ако няма -> чисто)
+monthEl.addEventListener("change", loadState);
+yearEl.addEventListener("input", loadState);
+
+// Запис при затваряне (ако storage е наличен)
+window.addEventListener("beforeunload", () => saveState());
+
+/* ================= INIT ================= */
+loadState();
+</script>
+
+</body>
+</html>
