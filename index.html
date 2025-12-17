@@ -2,7 +2,7 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<title>1Заплати – Ведомост и фишове</title>
+<title>2Заплати – Ведомост и фишове</title>
 
 <style>
 body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
@@ -79,10 +79,6 @@ input { width:95px; }
 
 <script>
   
-document.getElementById("month")?.addEventListener("change", saveState);
-document.getElementById("year")?.addEventListener("input", saveState);
-
-  
 const tbody=document.querySelector("#table tbody");
 const n=v=>Number(v)||0;
 const f=v=>n(v).toFixed(2);
@@ -109,10 +105,13 @@ function addRow(prefill = {}) {
     i.oninput = () => {
       calc(tr);
       total();
-      saveState();   // ⬅ автоматично запазване
+      saveState(); 
+      document.getElementById("month")?.addEventListener("change", saveState);
+      document.getElementById("year")?.addEventListener("input", saveState);
+// ⬅ автоматично запазване
     }
   );
-
+saveState();
   tbody.appendChild(tr);
 }
 
@@ -292,6 +291,10 @@ loadState();
 if (tbody.children.length === 0) {
   addRow();
 }
+
+window.addEventListener("beforeunload", () => {
+  saveState();
+});
 
 </script>
 
