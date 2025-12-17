@@ -2,7 +2,7 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8">
-<title>2Заплати – Ведомост и фишове</title>
+<title>Заплати – Ведомост и фишове</title>
 
 <style>
 body { font-family: Arial, sans-serif; padding:20px; background:#f4f6f8; }
@@ -15,19 +15,13 @@ table { border-collapse: collapse; width:100%; background:#fff; }
 th,td { border:1px solid #000; padding:5px; font-size:12px; text-align:center; }
 th { background:#e8eef5; }
 input { width:95px; }
-.num { font-variant-numeric: tabular-nums; }
 
-.section { margin-top:25px; }
-
-/* Фишове */
-.fish { border:1px solid #000; padding:10px; margin-bottom:12px; page-break-inside:avoid; }
+.fish { border:1px solid #000; padding:10px; margin-bottom:12px; }
 .cut { border-top:2px dashed #000; margin:12px 0; }
 
-/* Печат */
 @media print {
   .toolbar, .no-print { display:none !important; }
   body { background:#fff; padding:0; }
-  .page-break { page-break-after: always; }
 }
 </style>
 </head>
@@ -51,11 +45,10 @@ input { width:95px; }
   </label>
 
   <button onclick="addRow()">➕ Служител</button>
-  <button onclick="generateAll()">🔄 Генерирай документи</button>
+  <button onclick="generateAll()">🔄 Генерирай</button>
   <button onclick="window.print()">🖨 Печат</button>
 </div>
 
-<!-- ================= ВЪВЕЖДАНЕ ================= -->
 <table id="table" class="no-print">
 <thead>
 <tr>
@@ -69,20 +62,19 @@ input { width:95px; }
 <tbody></tbody>
 </table>
 
-<!-- ================= ФИШОВЕ ================= -->
-<div id="fishes" class="section"></div>
-
-<div class="page-break"></div>
-
-<!-- ================= ВЕДОМОСТ ================= -->
-<div id="summary" class="section"></div>
+<div id="fishes"></div>
+<div id="summary"></div>
 
 <script>
-  
-const tbody=document.querySelector("#table tbody");
-const n=v=>Number(v)||0;
-const f=v=>n(v).toFixed(2);
+/* ================= CONFIG ================= */
+const STORAGE_KEY = "zaplati_zdravets_v2";
 
+/* ================= HELPERS ================= */
+const tbody = document.querySelector("#table tbody");
+const n = v => Number(v) || 0;
+const f = v => n(v).toFixed(2);
+
+/* ================= CORE ================= */
 function addRow(prefill = {}) {
   const tr = document.createElement("tr");
   tr.innerHTML = `
@@ -101,22 +93,19 @@ function addRow(prefill = {}) {
 <td><input class="ud" type="number" value="${prefill.ud || 0}"></td>
 <td class="ostatak">0.00</td>`;
 
-  tr.querySelectorAll("input").forEach(i =>
-    i.oninput = () => {
+  tr.querySelectorAll("input").forEach(i => {
+    i.addEventListener("input", () => {
       calc(tr);
-      total();
-      saveState(); 
-      document.getElementById("month")?.addEventListener("change", saveState);
-      document.getElementById("year")?.addEventListener("input", saveState);
-// ⬅ автоматично запазване
-    }
-  );
-saveState();
+      saveState();
+    });
+  });
+
   tbody.appendChild(tr);
+  calc(tr);
+  saveState();
 }
 
-
-function calc(tr){
+function calc(tr) {
   const osn=n(tr.querySelector(".osn").value);
   const chm=n(tr.querySelector(".chm").value);
   const otr=n(tr.querySelector(".otr").value);
@@ -126,136 +115,38 @@ function calc(tr){
   const av=n(tr.querySelector(".av").value);
   const ud=n(tr.querySelector(".ud").value);
 
-  const stavka=chm?osn/chm:0;
-  const zap=stavka*otr;
-  const patni=dni*pden;
-  const obshto=zap+patni+dob;
-  const ostatak=obshto-av-ud;
+  const stavka = chm ? osn/chm : 0;
+  const zap = stavka * otr;
+  const patni = dni * pden;
+  const obshto = zap + patni + dob;
+  const ostatak = obshto - av - ud;
 
-  tr.querySelector(".stavka").textContent=f(stavka);
-  tr.querySelector(".zap").textContent=f(zap);
-  tr.querySelector(".patni").textContent=f(patni);
-  tr.querySelector(".obshto").textContent=f(obshto);
-  tr.querySelector(".ostatak").textContent=f(ostatak);
+  tr.querySelector(".stavka").textContent = f(stavka);
+  tr.querySelector(".zap").textContent = f(zap);
+  tr.querySelector(".patni").textContent = f(patni);
+  tr.querySelector(".obshto").textContent = f(obshto);
+  tr.querySelector(".ostatak").textContent = f(ostatak);
 }
 
-function generateAll(){
-  document.querySelectorAll("tbody tr").forEach(calc);
-  generateFishes();
-  generateSummary();
-}
-
-/* ===== ФИШОВЕ ===== */
-function generateFishes(){
-  const box=document.getElementById("fishes");
-  const m=document.getElementById("month").value;
-  const y=document.getElementById("year").value;
-  box.innerHTML=`<h3>Фишове – ${m} ${y}</h3>`;
-
-  document.querySelectorAll("tbody tr").forEach((tr,i)=>{
-    const name=tr.querySelector(".name").value;
-    if(!name)return;
-
-    box.innerHTML+=`
-<div class="fish">
-<b>Служител:</b> ${name}<br>
-<b>Период:</b> ${m} ${y}<br>
-<b>Основна заплата:</b> ${tr.querySelector(".osn").value} лв.<br>
-<b>Пътни:</b> ${tr.querySelector(".patni").textContent} лв.<br>
-<b>Добавки:</b> ${tr.querySelector(".dob").value} лв.<br>
-<b>Аванс:</b> ${tr.querySelector(".av").value} лв.<br>
-<b>Удръжки:</b> ${tr.querySelector(".ud").value} лв.<br>
-<hr>
-<b>ЗА ПОЛУЧАВАНЕ:</b> ${tr.querySelector(".ostatak").textContent} лв.
-</div>
-<div class="cut"></div>`;
-    if((i+1)%3===0) box.innerHTML+=`<div class="page-break"></div>`;
-  });
-}
-
-/* ===== ОБОБЩЕНА ВЕДОМОСТ ===== */
-function generateSummary(){
-  const m=document.getElementById("month").value;
-  const y=document.getElementById("year").value;
-
-  let tOsn=0,tPat=0,tDob=0,tAv=0,tUd=0,tNet=0;
-
-  let rows="";
-  document.querySelectorAll("tbody tr").forEach(tr=>{
-    const name=tr.querySelector(".name").value;
-    if(!name)return;
-
-    const osn=n(tr.querySelector(".osn").value);
-    const pat=n(tr.querySelector(".patni").textContent);
-    const dob=n(tr.querySelector(".dob").value);
-    const av=n(tr.querySelector(".av").value);
-    const ud=n(tr.querySelector(".ud").value);
-    const net=n(tr.querySelector(".ostatak").textContent);
-
-    tOsn+=osn; tPat+=pat; tDob+=dob; tAv+=av; tUd+=ud; tNet+=net;
-
-    rows+=`
-<tr>
-<td>${name}</td>
-<td>${f(osn)}</td>
-<td>${f(pat)}</td>
-<td>${f(dob)}</td>
-<td>${f(av)}</td>
-<td>${f(ud)}</td>
-<td>${f(net)}</td>
-</tr>`;
-  });
-
-  document.getElementById("summary").innerHTML=`
-<h3>Обобщена ведомост – ${m} ${y}</h3>
-<table>
-<tr>
-<th>Служител</th>
-<th>Основна</th>
-<th>Пътни</th>
-<th>Добавки</th>
-<th>Аванс</th>
-<th>Удръжки</th>
-<th>Нетно</th>
-</tr>
-${rows}
-<tr style="font-weight:bold;background:#eee;">
-<td>ОБЩО</td>
-<td>${f(tOsn)}</td>
-<td>${f(tPat)}</td>
-<td>${f(tDob)}</td>
-<td>${f(tAv)}</td>
-<td>${f(tUd)}</td>
-<td>${f(tNet)}</td>
-</tr>
-</table>
-
-<p style="margin-top:40px;">
-Съставил: ________________ &nbsp;&nbsp;
-Проверил: ________________
-</p>`;
-}
-
-const STORAGE_KEY = "zaplati_zdravets_v1";
-
+/* ================= SAVE / LOAD ================= */
 function saveState() {
   const data = {
-    month: document.getElementById("month")?.value,
-    year: document.getElementById("year")?.value,
+    month: month.value,
+    year: year.value,
     employees: []
   };
 
-  document.querySelectorAll("tbody tr").forEach(tr => {
+  tbody.querySelectorAll("tr").forEach(tr => {
     data.employees.push({
-      name: tr.querySelector(".name")?.value || "",
-      osn: tr.querySelector(".osn")?.value || "",
-      chm: tr.querySelector(".chm")?.value || "",
-      otr: tr.querySelector(".otr")?.value || "",
-      dni: tr.querySelector(".dni")?.value || "",
-      pden: tr.querySelector(".pden")?.value || "",
-      dob: tr.querySelector(".dob")?.value || "",
-      av:  tr.querySelector(".av")?.value || "",
-      ud:  tr.querySelector(".ud")?.value || ""
+      name: tr.querySelector(".name").value,
+      osn: tr.querySelector(".osn").value,
+      chm: tr.querySelector(".chm").value,
+      otr: tr.querySelector(".otr").value,
+      dni: tr.querySelector(".dni").value,
+      pden: tr.querySelector(".pden").value,
+      dob: tr.querySelector(".dob").value,
+      av: tr.querySelector(".av").value,
+      ud: tr.querySelector(".ud").value
     });
   });
 
@@ -267,35 +158,53 @@ function loadState() {
   if (!raw) return;
 
   const data = JSON.parse(raw);
-
-  if (data.month && document.getElementById("month")) {
-    document.getElementById("month").value = data.month;
-  }
-  if (data.year && document.getElementById("year")) {
-    document.getElementById("year").value = data.year;
-  }
+  month.value = data.month;
+  year.value = data.year;
 
   tbody.innerHTML = "";
-
-  data.employees.forEach(emp => {
-    addRow(emp);
-  });
-
-  // преизчисляване след зареждане
-  document.querySelectorAll("tbody tr").forEach(calc);
-  total();
+  data.employees.forEach(e => addRow(e));
 }
 
+/* ================= OUTPUT ================= */
+function generateAll() {
+  generateFishes();
+  generateSummary();
+}
+
+function generateFishes() {
+  const box = document.getElementById("fishes");
+  box.innerHTML = `<h3>Фишове – ${month.value} ${year.value}</h3>`;
+
+  tbody.querySelectorAll("tr").forEach(tr => {
+    const name = tr.querySelector(".name").value;
+    if (!name) return;
+
+    box.innerHTML += `
+<div class="fish">
+<b>${name}</b><br>
+Период: ${month.value} ${year.value}<br>
+За получаване: <b>${tr.querySelector(".ostatak").textContent} лв.</b>
+</div>
+<div class="cut"></div>`;
+  });
+}
+
+function generateSummary() {
+  let total = 0;
+  tbody.querySelectorAll(".ostatak").forEach(c => total += n(c.textContent));
+
+  document.getElementById("summary").innerHTML = `
+<h3>Обобщена ведомост</h3>
+<b>Общо за изплащане: ${f(total)} лв.</b>`;
+}
+
+/* ================= INIT ================= */
+month.addEventListener("change", saveState);
+year.addEventListener("input", saveState);
+window.addEventListener("beforeunload", saveState);
 
 loadState();
-if (tbody.children.length === 0) {
-  addRow();
-}
-
-window.addEventListener("beforeunload", () => {
-  saveState();
-});
-
+if (tbody.children.length === 0) addRow();
 </script>
 
 </body>
